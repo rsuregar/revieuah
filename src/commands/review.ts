@@ -12,7 +12,9 @@ export interface ReviewCommandOptions {
   lang: string;
 }
 
-export async function reviewCommand(options: ReviewCommandOptions): Promise<ReviewResponse> {
+export async function reviewCommand(
+  options: ReviewCommandOptions,
+): Promise<ReviewResponse> {
   await ensureGitRepository();
 
   const diff = await resolveDiff(options);
@@ -39,7 +41,7 @@ export async function reviewCommand(options: ReviewCommandOptions): Promise<Revi
       "No changes to assess.",
       "",
       "## Actionable Suggestions",
-      "- Stage or select changes before running ReviuAh."
+      "- Stage or select changes before running ReviuAh.",
     ].join("\n");
 
     console.log(emptyMarkdown);
@@ -56,17 +58,22 @@ export async function reviewCommand(options: ReviewCommandOptions): Promise<Revi
   const provider = new OpenAIProvider({
     apiKey,
     baseURL: process.env.REVIUAH_PROVIDER_URL,
-    model: process.env.REVIUAH_MODEL
+    model: process.env.REVIUAH_MODEL,
   });
 
-  const result = await provider.review({ diff: trimmedDiff, language: options.lang });
+  const result = await provider.review({
+    diff: trimmedDiff,
+    language: options.lang,
+  });
   console.log(result.markdown);
 
   return result;
 }
 
 async function ensureGitRepository(): Promise<void> {
-  const check = await execa("git", ["rev-parse", "--is-inside-work-tree"], { reject: false });
+  const check = await execa("git", ["rev-parse", "--is-inside-work-tree"], {
+    reject: false,
+  });
   if (check.exitCode !== 0 || check.stdout.trim() !== "true") {
     throw new Error("ReviuAh must be run inside a git repository.");
   }
