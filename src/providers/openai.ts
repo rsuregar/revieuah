@@ -1,5 +1,10 @@
 import OpenAI from "openai";
-import type { Provider, ReviewRequest, ReviewResponse, RiskLevel } from "./index.js";
+import type {
+  Provider,
+  ReviewRequest,
+  ReviewResponse,
+  RiskLevel,
+} from "./index.js";
 
 export interface OpenAIProviderOptions {
   apiKey: string;
@@ -14,36 +19,62 @@ interface ProviderTemplate {
 
 const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   openai: { baseURL: "https://api.openai.com/v1", defaultModel: "gpt-4o" },
-  anthropic: { baseURL: "https://api.anthropic.com/v1", defaultModel: "claude-sonnet-4-5" },
+  anthropic: {
+    baseURL: "https://api.anthropic.com/v1",
+    defaultModel: "claude-sonnet-4-5",
+  },
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-    defaultModel: "gemini-2.5-flash"
+    defaultModel: "gemini-2.5-flash",
   },
-  deepseek: { baseURL: "https://api.deepseek.com", defaultModel: "deepseek-chat" },
-  groq: { baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile" },
-  mistral: { baseURL: "https://api.mistral.ai/v1", defaultModel: "mistral-large-latest" },
+  deepseek: {
+    baseURL: "https://api.deepseek.com",
+    defaultModel: "deepseek-chat",
+  },
+  groq: {
+    baseURL: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile",
+  },
+  mistral: {
+    baseURL: "https://api.mistral.ai/v1",
+    defaultModel: "mistral-large-latest",
+  },
   together: {
     baseURL: "https://api.together.xyz/v1",
-    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
   },
   fireworks: {
     baseURL: "https://api.fireworks.ai/inference/v1",
-    defaultModel: "accounts/fireworks/models/llama-v3p3-70b-instruct"
+    defaultModel: "accounts/fireworks/models/llama-v3p3-70b-instruct",
   },
-  openrouter: { baseURL: "https://openrouter.ai/api/v1", defaultModel: "anthropic/claude-3.5-sonnet" },
-  cerebras: { baseURL: "https://api.cerebras.ai/v1", defaultModel: "llama-3.3-70b" },
-  glm: { baseURL: "https://api.z.ai/api/coding/paas/v4", defaultModel: "glm-4.7" },
-  ollama: { baseURL: "http://localhost:11434/v1", defaultModel: "llama3.1" }
+  openrouter: {
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultModel: "anthropic/claude-3.5-sonnet",
+  },
+  cerebras: {
+    baseURL: "https://api.cerebras.ai/v1",
+    defaultModel: "llama-3.3-70b",
+  },
+  glm: {
+    baseURL: "https://api.z.ai/api/coding/paas/v4",
+    defaultModel: "glm-4.7",
+  },
+  ollama: { baseURL: "http://localhost:11434/v1", defaultModel: "llama3.1" },
 };
 
 const DEFAULT_PROVIDER = "gemini";
 
-export function resolveProviderDefaults(providerName?: string): ProviderTemplate {
+export function resolveProviderDefaults(
+  providerName?: string,
+): ProviderTemplate {
   if (!providerName) {
     return PROVIDER_TEMPLATES[DEFAULT_PROVIDER];
   }
 
-  return PROVIDER_TEMPLATES[providerName.toLowerCase()] ?? PROVIDER_TEMPLATES[DEFAULT_PROVIDER];
+  return (
+    PROVIDER_TEMPLATES[providerName.toLowerCase()] ??
+    PROVIDER_TEMPLATES[DEFAULT_PROVIDER]
+  );
 }
 
 export class OpenAIProvider implements Provider {
@@ -53,7 +84,7 @@ export class OpenAIProvider implements Provider {
   constructor(options: OpenAIProviderOptions) {
     this.client = new OpenAI({
       apiKey: options.apiKey,
-      baseURL: options.baseURL
+      baseURL: options.baseURL,
     });
     this.model = options.model;
   }
@@ -68,13 +99,13 @@ export class OpenAIProvider implements Provider {
         {
           role: "system",
           content:
-            "You are ReviuAh, a senior software reviewer. You MUST output valid Markdown and strictly follow the required headings and order."
+            "You are ReviuAh, a senior software reviewer. You MUST output valid Markdown and strictly follow the required headings and order.",
         },
         {
           role: "user",
-          content: prompt
-        }
-      ]
+          content: prompt,
+        },
+      ],
     });
 
     const markdown = response.choices[0]?.message?.content?.trim() ?? "";
@@ -99,16 +130,23 @@ export class OpenAIProvider implements Provider {
       "## Actionable Suggestions",
       "Keep the review concise and practical.",
       "\nGit diff:\n",
-      request.diff
+      request.diff,
     ].join("\n");
   }
 }
 
 function extractRiskLevel(markdown: string): RiskLevel {
-  const match = markdown.match(/##\s*Risk Level[\s\S]*?\b(low|medium|high|unknown)\b/i);
+  const match = markdown.match(
+    /##\s*Risk Level[\s\S]*?\b(low|medium|high|unknown)\b/i,
+  );
   const risk = match?.[1]?.toLowerCase();
 
-  if (risk === "low" || risk === "medium" || risk === "high" || risk === "unknown") {
+  if (
+    risk === "low" ||
+    risk === "medium" ||
+    risk === "high" ||
+    risk === "unknown"
+  ) {
     return risk;
   }
 
