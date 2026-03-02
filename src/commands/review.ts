@@ -1,6 +1,9 @@
 import { execa } from "execa";
 import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
-import { OpenAIProvider } from "../providers/openai.js";
+import {
+  OpenAIProvider,
+  resolveProviderDefaults,
+} from "../providers/openai.js";
 import type { ReviewResponse } from "../providers/index.js";
 
 const MAX_DIFF_SIZE = 120000;
@@ -55,10 +58,14 @@ export async function reviewCommand(
     throw new Error("Missing REVIUAH_API_KEY environment variable.");
   }
 
+  const providerDefaults = resolveProviderDefaults(
+    process.env.REVIUAH_PROVIDER,
+  );
+
   const provider = new OpenAIProvider({
     apiKey,
-    baseURL: process.env.REVIUAH_PROVIDER_URL,
-    model: process.env.REVIUAH_MODEL,
+    baseURL: process.env.REVIUAH_PROVIDER_URL ?? providerDefaults.baseURL,
+    model: process.env.REVIUAH_MODEL ?? providerDefaults.defaultModel,
   });
 
   const result = await provider.review({
