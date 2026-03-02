@@ -1,0 +1,25 @@
+{
+  "name": "reviuah",
+  "version": "0.1.0",
+  "description": "AI-powered Git diff reviewer CLI",
+  "type": "module",
+  "bin": {
+    "reviuah": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit",
+    "start": "node dist/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "execa": "^9.3.1",
+    "openai": "^4.67.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
