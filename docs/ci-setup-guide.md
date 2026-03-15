@@ -30,6 +30,9 @@ ReviuAh can be added to any repository (GitHub or GitLab) to **automatically rev
    - Value: your API key
 4. Click **Add secret**.
 
+Optional variable (Actions → **Variables**) for per-repo behavior:
+- `REVIUAH_ENABLE_SUMMARY` = `0` to disable summary comment generation (per-file review still runs)
+
 > `GITHUB_TOKEN` is already available; no need to add it manually.
 
 **Comment author:** With `GITHUB_TOKEN`, comments and reviews appear as **"github-actions bot"**. GitHub does not allow renaming this. To show a different author (e.g. your username or "ReviuAh"), use a [Personal Access Token (PAT)](https://github.com/settings/tokens) with `repo` scope: add it as a secret (e.g. `GH_PAT`) and in the workflow use `github-token: ${{ secrets.GH_PAT }}` instead of `secrets.GITHUB_TOKEN` in the steps that post comments. The comment will then appear as the user who created the PAT.
@@ -135,6 +138,7 @@ Create a new branch, change any file, and open a Pull Request. Within a few minu
 | `GITLAB_TOKEN` | Personal or project token with `api` scope | ✅ | ✅ |
 | `REVIUAH_PROVIDER` | *(optional)* e.g. `gemini`, `openai`, `agentrouter` | — | — |
 | `REVIUAH_MODEL` | *(optional)* e.g. `gpt-4o`, `gemini-2.0` | — | — |
+| `REVIUAH_ENABLE_SUMMARY` | *(optional)* `0` to skip summary note (per-file only) | — | — |
 
 > **GITLAB_TOKEN** is required to post comments on MRs. Create it under **User Settings → Access Tokens** (personal) or **Project → Settings → Access Tokens** (project).  
 > Required scope: `api`.
@@ -268,12 +272,12 @@ Setiap repo bisa memakai **provider dan model berbeda** lewat variable (tanpa ub
 
 **GitHub Actions**  
 - Buka repo → **Settings** → **Secrets and variables** → **Actions** → tab **Variables**.  
-- Tambah variable: `REVIUAH_PROVIDER`, `REVIUAH_MODEL`.  
-- Workflow `code-review.yml` sudah baca `vars.REVIUAH_PROVIDER` dan `vars.REVIUAH_MODEL`; kalau tidak di-set, provider default = `gemini`.
+- Tambah variable: `REVIUAH_PROVIDER`, `REVIUAH_MODEL`, `REVIUAH_ENABLE_SUMMARY` (optional).  
+- Workflow `code-review.yml` baca `vars.REVIUAH_PROVIDER`, `vars.REVIUAH_MODEL`, dan `vars.REVIUAH_ENABLE_SUMMARY`; jika `REVIUAH_ENABLE_SUMMARY=0`, summary step + summary comment akan dilewati.
 
 **GitLab CI**  
 - Buka repo → **Settings** → **CI/CD** → **Variables**.  
-- Tambah variable: `REVIUAH_PROVIDER`, `REVIUAH_MODEL`.  
+- Tambah variable: `REVIUAH_PROVIDER`, `REVIUAH_MODEL`, `REVIUAH_ENABLE_SUMMARY` (optional).  
 - Variable CI/CD otomatis tersedia di job; ReviuAh baca dari environment.
 
 **Contoh:**
@@ -288,6 +292,9 @@ REVIUAH_PROVIDER: openai
 REVIUAH_MODEL: gpt-4o
 
 # Repo C: pakai AgentRouter (default), tidak perlu set variable
+
+# Repo D: per-file only (skip summary comment)
+REVIUAH_ENABLE_SUMMARY: "0"
 ```
 
 ### Limit Diff Size
@@ -297,6 +304,22 @@ For large repos, limit the diff sent to the LLM:
 ```yaml
 REVIUAH_MAX_DIFF_SIZE: 60000   # characters (default 120000)
 ```
+
+### Enable/Disable Summary
+
+Use `REVIUAH_ENABLE_SUMMARY` to control summary generation in CI workflows:
+
+```yaml
+# default (or unset): summary enabled
+REVIUAH_ENABLE_SUMMARY: "1"
+
+# disable summary (run per-file only)
+REVIUAH_ENABLE_SUMMARY: "0"
+```
+
+When disabled:
+- GitHub workflow skips the "Run overall review" and "Post summary comment" steps.
+- GitLab workflow skips summary review and MR summary note posting.
 
 ### Output Language
 

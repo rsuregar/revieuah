@@ -12,6 +12,7 @@ jobs:
       pull-requests: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      REVIUAH_ENABLE_SUMMARY: ${{ vars.REVIUAH_ENABLE_SUMMARY || '1' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,7 +30,7 @@ jobs:
 
       # Skip review steps for fork PRs (no access to secrets)
       - name: Run overall review
-        if: env.REVIUAH_API_KEY != ''
+        if: secrets.REVIUAH_API_KEY != '' && env.REVIUAH_ENABLE_SUMMARY != '0'
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
@@ -38,7 +39,7 @@ jobs:
           REVIUAH_MAX_DIFF_SIZE: 60000
 
       - name: Run per-file review
-        if: env.REVIUAH_API_KEY != ''
+        if: secrets.REVIUAH_API_KEY != ''
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
@@ -48,7 +49,7 @@ jobs:
 
       # 3. Post overall summary as PR comment (create or update)
       - name: Post summary comment
-        if: success() && hashFiles('review.md') != ''
+        if: success() && env.REVIUAH_ENABLE_SUMMARY != '0' && hashFiles('review.md') != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

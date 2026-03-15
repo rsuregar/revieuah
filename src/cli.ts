@@ -93,6 +93,8 @@ program
   .option("--lang <lang>", "output language", "en")
   .option("--out <file>", "write review markdown to file")
   .option("--per-file", "output per-file inline comments as JSON (for CI integration)", false)
+  .option("--summary", "enable summary markdown review output (default)", true)
+  .option("--no-summary", "disable summary markdown review output")
   .option("--compact", "minimal review output (fewer sections, lower token usage)", false)
   .option("--prompt <text>", "custom instructions for the reviewer (e.g. focus on security, follow our style guide)")
   .action(
@@ -104,6 +106,7 @@ program
       lang?: string;
       out?: string;
       perFile?: boolean;
+      summary?: boolean;
       compact?: boolean;
       prompt?: string;
     }) => {
@@ -115,6 +118,7 @@ program
         lang: options.lang ?? "en",
         out: options.out,
         perFile: Boolean(options.perFile),
+        summary: options.summary,
         compact: Boolean(options.compact),
         customPrompt: options.prompt,
       });

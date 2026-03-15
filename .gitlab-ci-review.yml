@@ -8,13 +8,22 @@
 #   GITLAB_TOKEN     — personal/project token with scope: api
 #
 # Optional (each repo can use a different provider/model):
-#   REVIUAH_PROVIDER   — e.g. gemini, openai, agentrouter, deepseek (default: agentrouter)
+#   REVIUAH_PROVIDER   — e.g. gemini, openai, agentrouter, deepseek (default: gemini)
 #   REVIUAH_MODEL      — e.g. gpt-4o, gemini-2.0, gemini-flash-latest
+#   REVIUAH_ENABLE_SUMMARY — "1" (default) run summary review+note, "0" skip summary
 #   REVIUAH_PROVIDER_URL, REVIUAH_MAX_DIFF_SIZE
 #
 # If CLI works but CI doesn't: see docs/ci-setup-guide.md "Token permissions and why CI might fail".
 # - REVIUAH_API_KEY: uncheck "Protected" if your MR branch is not protected.
 # - GITLAB_TOKEN: must be a Personal/Project token with scope "api"; CI_JOB_TOKEN often cannot post MR notes.
+#
+# ROOT CAUSE NOTES (see docs/plan.md for full details):
+# 1. Do NOT use "exit 0" mid-script in GitLab CI — the entire script runs in ONE shell session,
+#    so exit 0 kills all remaining steps including the inline-comment block.
+#    Use if/else guards instead so each section is independently skippable.
+# 2. REVIUAH_PROVIDER must be set explicitly (default: gemini). Without it, the agentrouter
+#    default may return an empty overall review (review.md not written) while per-file
+#    review.json still succeeds — which previously triggered the exit 0 and silenced everything.
 
 stages:
   - review
@@ -26,75 +35,189 @@ code-review:
     - merge_requests
   variables:
     GIT_DEPTH: 0
+    # Default provider matches what works on GitHub Actions; override via CI/CD variable.
+    REVIUAH_PROVIDER: gemini
+    REVIUAH_ENABLE_SUMMARY: "1"
+    REVIUAH_MAX_DIFF_SIZE: "60000"
   before_script:
     - apt-get update -qq && apt-get install -yqq jq > /dev/null 2>&1 || true
   script:
-    # Check tokens are set (values not printed). If "no", fix variables (Protected / scope); see docs/ci-setup-guide.md
+    # ── 1. Sanity-check env ───────────────────────────────────────────────────
     - |
-      echo "REVIUAH_API_KEY is set: $([ -n \"$REVIUAH_API_KEY\" ] && echo yes || echo no)"
-      echo "GITLAB_TOKEN is set: $([ -n \"$GITLAB_TOKEN\" ] && echo yes || echo no)"
+      echo "=== ReviuAh CI debug ==="
+      echo "REVIUAH_API_KEY is set: $([ -n "$REVIUAH_API_KEY" ] && echo yes || echo NO — fix CI/CD variable)"
+      echo "GITLAB_TOKEN is set:    $([ -n "$GITLAB_TOKEN" ]    && echo yes || echo NO — fix CI/CD variable)"
+      echo "REVIUAH_PROVIDER:       ${REVIUAH_PROVIDER:-<not set, will default>}"
+      echo "REVIUAH_MODEL:          ${REVIUAH_MODEL:-<not set, provider default>}"
+      echo "REVIUAH_MAX_DIFF_SIZE:  ${REVIUAH_MAX_DIFF_SIZE:-<not set>}"
+      echo "CI project:             ${CI_PROJECT_PATH:-unknown}"
+      echo "MR IID:                 ${CI_MERGE_REQUEST_IID:-unknown}"
+      echo "Target branch:          ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-unknown}"
+      echo "Commit SHA:             ${CI_COMMIT_SHA:-unknown}"
+      echo "========================"
+
+    # ── 2. Install ReviuAh ───────────────────────────────────────────────────
     - npm install -g reviuah@latest
 
-    # Overall summary (|| true = do not fail job if API/rate-limit error; comment will be skipped)
-    - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --out review.md --lang en || true
+    # ── 3. Run overall summary review → review.md (optional) ─────────────────
+    # || true: do not fail the job on API/rate-limit errors; missing file is handled below.
+    - |
+      if [ "${REVIUAH_ENABLE_SUMMARY:-1}" = "0" ]; then
+        echo "Summary disabled (REVIUAH_ENABLE_SUMMARY=0)."
+      else
+        reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --out review.md --lang en || true
+      fi
 
-    # Per-file inline comments
+    # ── 4. Run per-file review → review.json ─────────────────────────────────
     - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --per-file --out review.json --lang en || true
 
-    # Post/update summary note on MR (skip if review.md missing or empty)
+    # ── 5. Post/update summary note on MR ────────────────────────────────────
+    # IMPORTANT: do NOT use "exit 0" here. Use if/else so the next section always runs.
     - |
-      if [ ! -s review.md ]; then
-        echo "ReviuAh did not produce review.md (check logs above for errors). Comment skipped."
-        exit 0
-      fi
-      API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
-      TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
-      MARKER="<!-- reviuah-review -->"
-
-      if command -v jq > /dev/null 2>&1; then
-        EXISTING_ID=$(curl -sf -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
-          | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))][0].id // empty')
+      if [ "${REVIUAH_ENABLE_SUMMARY:-1}" = "0" ]; then
+        echo "Summary disabled — MR summary note skipped."
+      elif [ ! -s review.md ]; then
+        echo "Debug: review.md is missing or empty — summary comment skipped."
+        echo "       This is usually caused by the provider returning an empty response."
+        echo "       Check REVIUAH_PROVIDER (current: ${REVIUAH_PROVIDER}) and your API key."
       else
-        EXISTING_ID=$(curl -sf -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
-          | python3 -c "import json,sys;[print(n['id']) or exit() for n in json.load(sys.stdin) if '$MARKER' in n.get('body','')]" 2>/dev/null || true)
+        echo "Debug: review.md found ($(wc -c < review.md) bytes) — posting summary note."
+
+        API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
+        TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+        MARKER="<!-- reviuah-review -->"
+
+        echo "Debug: summary notes API URL: $API_URL"
+        echo "Debug: auth token source: $([ -n "$GITLAB_TOKEN" ] && echo GITLAB_TOKEN || echo CI_JOB_TOKEN)"
+
+        NOTES_RESPONSE=$(mktemp)
+        NOTES_HTTP_CODE=$(curl -sS -o "$NOTES_RESPONSE" -w "%{http_code}" \
+          -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" || true)
+        echo "Debug: list notes HTTP status: $NOTES_HTTP_CODE"
+        if [ "$NOTES_HTTP_CODE" != "200" ]; then
+          echo "Debug: list notes response body:"
+          cat "$NOTES_RESPONSE"
+        fi
+
+        if command -v jq > /dev/null 2>&1; then
+          EXISTING_ID=$(jq -r --arg m "$MARKER" \
+            '[.[] | select(.body | contains($m))][0].id // empty' \
+            "$NOTES_RESPONSE" 2>/dev/null || true)
+        else
+          EXISTING_ID=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(next((str(n['id']) for n in d if '${MARKER}' in n.get('body','')), ''))" "$NOTES_RESPONSE" 2>/dev/null || true)
+        fi
+        rm -f "$NOTES_RESPONSE"
+
+        BODY_FILE=$(mktemp)
+        printf '%s\n# 🔍 ReviuAh — AI Code Review\n\n' "$MARKER" > "$BODY_FILE"
+        cat review.md >> "$BODY_FILE"
+        echo "Debug: summary body size: $(wc -c < "$BODY_FILE") bytes"
+
+        if [ -n "$EXISTING_ID" ]; then
+          echo "Debug: updating existing note id=$EXISTING_ID"
+          SUMMARY_RESPONSE=$(mktemp)
+          SUMMARY_HTTP_CODE=$(curl -sS -o "$SUMMARY_RESPONSE" -w "%{http_code}" \
+            -X PUT -H "PRIVATE-TOKEN: $TOKEN" \
+            --data-urlencode "body@$BODY_FILE" \
+            "$API_URL/$EXISTING_ID" || true)
+          echo "Debug: update summary note HTTP status: $SUMMARY_HTTP_CODE"
+          if [ "$SUMMARY_HTTP_CODE" -lt 200 ] || [ "$SUMMARY_HTTP_CODE" -ge 300 ]; then
+            echo "Debug: update summary note failed — response body:"
+            cat "$SUMMARY_RESPONSE"
+          fi
+          rm -f "$SUMMARY_RESPONSE"
+        else
+          echo "Debug: creating new summary note"
+          SUMMARY_RESPONSE=$(mktemp)
+          SUMMARY_HTTP_CODE=$(curl -sS -o "$SUMMARY_RESPONSE" -w "%{http_code}" \
+            -X POST -H "PRIVATE-TOKEN: $TOKEN" \
+            --data-urlencode "body@$BODY_FILE" \
+            "$API_URL" || true)
+          echo "Debug: create summary note HTTP status: $SUMMARY_HTTP_CODE"
+          if [ "$SUMMARY_HTTP_CODE" -lt 200 ] || [ "$SUMMARY_HTTP_CODE" -ge 300 ]; then
+            echo "Debug: create summary note failed — response body:"
+            cat "$SUMMARY_RESPONSE"
+          fi
+          rm -f "$SUMMARY_RESPONSE"
+        fi
+        rm -f "$BODY_FILE"
       fi
 
-      BODY=$(printf '%s\n# 🔍 ReviuAh — AI Code Review\n\n%s' "$MARKER" "$(cat review.md)")
-
-      if [ -n "$EXISTING_ID" ]; then
-        curl -sf -X PUT -H "PRIVATE-TOKEN: $TOKEN" --data-urlencode "body=$BODY" "$API_URL/$EXISTING_ID" > /dev/null
-      else
-        curl -sf -X POST -H "PRIVATE-TOKEN: $TOKEN" --data-urlencode "body=$BODY" "$API_URL" > /dev/null
-      fi
-
-    # Post per-file inline comments as MR discussions
+    # ── 6. Post per-file inline comments as MR discussions ───────────────────
+    # IMPORTANT: do NOT use "exit 0" here either. Use an if guard.
     - |
-      [ -s review.json ] || exit 0
-      API_BASE="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}"
-      TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
-      HEAD_SHA=$(git rev-parse HEAD)
-      BASE_SHA=$(git merge-base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)
-
-      EMOJI_MAP='{"critical":"🔴","warning":"🟡","suggestion":"💡","praise":"✅"}'
-
-      if command -v jq > /dev/null 2>&1; then
-        jq -c --arg base "$BASE_SHA" --arg head "$HEAD_SHA" --argjson em "$EMOJI_MAP" \
-          '.comments[] | select(.path != "" and .line > 0) |
-          { body: (($em[.severity] // "💡") + " **" + .severity + "**: " + .body),
-            path: .path, line: .line, base: $base, head: $head }' review.json | while IFS= read -r item; do
-          CPATH=$(echo "$item" | jq -r '.path')
-          CLINE=$(echo "$item" | jq -r '.line')
-          CBODY=$(echo "$item" | jq -r '.body')
-          curl -sf -X POST -H "PRIVATE-TOKEN: $TOKEN" \
-            --data-urlencode "body=$CBODY" \
-            --data-urlencode "position[base_sha]=$BASE_SHA" \
-            --data-urlencode "position[head_sha]=$HEAD_SHA" \
-            --data-urlencode "position[start_sha]=$BASE_SHA" \
-            --data-urlencode "position[position_type]=text" \
-            --data-urlencode "position[new_path]=$CPATH" \
-            --data-urlencode "position[new_line]=$CLINE" \
-            "$API_BASE/discussions" > /dev/null || echo "Warn: comment on $CPATH:$CLINE skipped"
-        done
+      if [ ! -s review.json ]; then
+        echo "Debug: review.json is missing or empty — inline comments skipped."
       else
-        echo "jq not available; per-file inline comments skipped."
+        echo "Debug: review.json found ($(wc -c < review.json) bytes) — posting inline discussions."
+
+        API_BASE="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}"
+        TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+        HEAD_SHA=$(git rev-parse HEAD)
+        BASE_SHA=$(git merge-base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)
+
+        echo "Debug: discussions API base: $API_BASE"
+        echo "Debug: base SHA:             $BASE_SHA"
+        echo "Debug: head SHA:             $HEAD_SHA"
+
+        EMOJI_MAP='{"critical":"🔴","warning":"🟡","suggestion":"💡","praise":"✅"}'
+
+        if command -v jq > /dev/null 2>&1; then
+          COMMENT_COUNT=$(jq '[.comments[] | select(.path != "" and .line > 0)] | length' review.json 2>/dev/null || echo 0)
+          echo "Debug: inline comments to post: $COMMENT_COUNT"
+
+          jq -c --arg base "$BASE_SHA" --arg head "$HEAD_SHA" --argjson em "$EMOJI_MAP" \
+            '.comments[] | select(.path != "" and .line > 0) |
+            { body: (($em[.severity] // "💡") + " **" + .severity + "**: " + .body),
+              path: .path, line: .line }' review.json | while IFS= read -r item; do
+
+            CPATH=$(echo "$item" | jq -r '.path')
+            CLINE=$(echo "$item" | jq -r '.line')
+            CBODY=$(echo "$item" | jq -r '.body')
+
+            echo "Debug: posting inline discussion → $CPATH:$CLINE"
+
+            DISCUSSION_RESPONSE=$(mktemp)
+            DISCUSSION_HTTP_CODE=$(curl -sS -o "$DISCUSSION_RESPONSE" -w "%{http_code}" \
+              -X POST -H "PRIVATE-TOKEN: $TOKEN" \
+              --data-urlencode "body=$CBODY" \
+              --data-urlencode "position[base_sha]=$BASE_SHA" \
+              --data-urlencode "position[head_sha]=$HEAD_SHA" \
+              --data-urlencode "position[start_sha]=$BASE_SHA" \
+              --data-urlencode "position[position_type]=text" \
+              --data-urlencode "position[new_path]=$CPATH" \
+              --data-urlencode "position[new_line]=$CLINE" \
+              "$API_BASE/discussions" || true)
+
+            if [ "$DISCUSSION_HTTP_CODE" -ge 200 ] && [ "$DISCUSSION_HTTP_CODE" -lt 300 ]; then
+              echo "Debug: ✅ inline discussion created for $CPATH:$CLINE"
+            else
+              echo "Warn: ❌ inline discussion failed for $CPATH:$CLINE (HTTP $DISCUSSION_HTTP_CODE)"
+              echo "Debug: GitLab API response:"
+              cat "$DISCUSSION_RESPONSE"
+
+              # Fallback: open a plain MR thread so the review is not silently lost
+              FALLBACK_BODY=$(printf '⚠️ **ReviuAh — inline comment could not be anchored**\n\n**File:** `%s`  \n**Line:** %s\n\n**Reason:** GitLab rejected the diff position (HTTP %s). Common causes: line is not in the MR diff, wrong SHA, or the file path does not match.\n\n---\n\n%s' \
+                "$CPATH" "$CLINE" "$DISCUSSION_HTTP_CODE" "$CBODY")
+
+              FALLBACK_RESPONSE=$(mktemp)
+              FALLBACK_HTTP_CODE=$(curl -sS -o "$FALLBACK_RESPONSE" -w "%{http_code}" \
+                -X POST -H "PRIVATE-TOKEN: $TOKEN" \
+                --data-urlencode "body=$FALLBACK_BODY" \
+                "$API_BASE/discussions" || true)
+
+              if [ "$FALLBACK_HTTP_CODE" -ge 200 ] && [ "$FALLBACK_HTTP_CODE" -lt 300 ]; then
+                echo "Debug: ✅ fallback MR thread opened for $CPATH:$CLINE"
+              else
+                echo "Warn: ❌ fallback MR thread also failed for $CPATH:$CLINE (HTTP $FALLBACK_HTTP_CODE)"
+                echo "Debug: fallback response:"
+                cat "$FALLBACK_RESPONSE"
+              fi
+              rm -f "$FALLBACK_RESPONSE"
+            fi
+            rm -f "$DISCUSSION_RESPONSE"
+          done
+        else
+          echo "jq not available — per-file inline comments skipped."
+        fi
       fi

@@ -34,6 +34,8 @@ export interface ReviewCommandOptions {
   customPrompt?: string;
   /** Minimal output (fewer sections, lower token usage). */
   compact?: boolean;
+  /** Enable/disable summary markdown review generation. */
+  summary?: boolean;
 }
 
 export async function reviewCommand(
@@ -85,6 +87,12 @@ export async function reviewCommand(
   const compact =
     options.compact === true ||
     (process.env.REVIUAH_COMPACT?.trim() === "1" || process.env.REVIUAH_COMPACT?.trim()?.toLowerCase() === "true");
+  const summaryEnabled = resolveSummaryEnabled(options.summary);
+
+  if (!options.perFile && !summaryEnabled) {
+    console.error("ReviuAh: summary generation disabled (--no-summary or REVIUAH_ENABLE_SUMMARY=0).");
+    return { markdown: "", risk: "unknown" };
+  }
 
   printBanner();
   const stopSpinner = startSpinner("Generating review");
@@ -194,6 +202,15 @@ async function outputReview(markdown: string, outPath?: string): Promise<void> {
   } else {
     console.log(markdown);
   }
+}
+
+function resolveSummaryEnabled(cliSummary?: boolean): boolean {
+  if (cliSummary === false) return false;
+  if (cliSummary === true) return true;
+
+  const env = process.env.REVIUAH_ENABLE_SUMMARY?.trim().toLowerCase();
+  if (!env) return true;
+  return !(env === "0" || env === "false" || env === "no");
 }
 
 async function ensureGitRepository(): Promise<void> {
