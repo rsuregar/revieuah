@@ -11,6 +11,10 @@
 #   REVIUAH_PROVIDER   — e.g. gemini, openai, agentrouter, deepseek (default: agentrouter)
 #   REVIUAH_MODEL      — e.g. gpt-4o, gemini-2.0, gemini-flash-latest
 #   REVIUAH_PROVIDER_URL, REVIUAH_MAX_DIFF_SIZE
+#
+# If CLI works but CI doesn't: see docs/ci-setup-guide.md "Token permissions and why CI might fail".
+# - REVIUAH_API_KEY: uncheck "Protected" if your MR branch is not protected.
+# - GITLAB_TOKEN: must be a Personal/Project token with scope "api"; CI_JOB_TOKEN often cannot post MR notes.
 
 stages:
   - review
@@ -25,6 +29,10 @@ code-review:
   before_script:
     - apt-get update -qq && apt-get install -yqq jq > /dev/null 2>&1 || true
   script:
+    # Check tokens are set (values not printed). If "no", fix variables (Protected / scope); see docs/ci-setup-guide.md
+    - |
+      echo "REVIUAH_API_KEY is set: $([ -n \"$REVIUAH_API_KEY\" ] && echo yes || echo no)"
+      echo "GITLAB_TOKEN is set: $([ -n \"$GITLAB_TOKEN\" ] && echo yes || echo no)"
     - npm install -g reviuah@latest
 
     # Overall summary (|| true = do not fail job if API/rate-limit error; comment will be skipped)
