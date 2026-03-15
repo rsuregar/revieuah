@@ -1,0 +1,92 @@
+# ReviuAh GitLab CI — auto review + comment on MR
+# Copy to your repo as .gitlab-ci.yml (or include it).
+# Uses published ReviuAh from npm (npm install -g reviuah@latest); works in any repo.
+#
+# You use YOUR OWN API key. Add it in your project's CI/CD variables (below).
+# Required CI/CD variables (Settings > CI/CD > Variables):
+#   REVIUAH_API_KEY  — your LLM API key (Gemini, OpenAI, AgentRouter, etc.)
+#   GITLAB_TOKEN     — personal/project token with scope: api
+#
+# Optional (each repo can use a different provider/model):
+#   REVIUAH_PROVIDER   — e.g. gemini, openai, agentrouter, deepseek (default: agentrouter)
+#   REVIUAH_MODEL      — e.g. gpt-4o, gemini-2.0, gemini-flash-latest
+#   REVIUAH_PROVIDER_URL, REVIUAH_MAX_DIFF_SIZE
+
+stages:
+  - review
+
+code-review:
+  stage: review
+  image: node:22
+  only:
+    - merge_requests
+  variables:
+    GIT_DEPTH: 0
+  before_script:
+    - apt-get update -qq && apt-get install -yqq jq > /dev/null 2>&1 || true
+  script:
+    - npm install -g reviuah@latest
+
+    # Overall summary (|| true = do not fail job if API/rate-limit error; comment will be skipped)
+    - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --out review.md --lang en || true
+
+    # Per-file inline comments
+    - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --per-file --out review.json --lang en || true
+
+    # Post/update summary note on MR (skip if review.md missing or empty)
+    - |
+      if [ ! -s review.md ]; then
+        echo "ReviuAh did not produce review.md (check logs above for errors). Comment skipped."
+        exit 0
+      fi
+      API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
+      TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+      MARKER="<!-- reviuah-review -->"
+
+      if command -v jq > /dev/null 2>&1; then
+        EXISTING_ID=$(curl -sf -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
+          | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))][0].id // empty')
+      else
+        EXISTING_ID=$(curl -sf -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
+          | python3 -c "import json,sys;[print(n['id']) or exit() for n in json.load(sys.stdin) if '$MARKER' in n.get('body','')]" 2>/dev/null || true)
+      fi
+
+      BODY=$(printf '%s\n# 🔍 ReviuAh — AI Code Review\n\n%s' "$MARKER" "$(cat review.md)")
+
+      if [ -n "$EXISTING_ID" ]; then
+        curl -sf -X PUT -H "PRIVATE-TOKEN: $TOKEN" --data-urlencode "body=$BODY" "$API_URL/$EXISTING_ID" > /dev/null
+      else
+        curl -sf -X POST -H "PRIVATE-TOKEN: $TOKEN" --data-urlencode "body=$BODY" "$API_URL" > /dev/null
+      fi
+
+    # Post per-file inline comments as MR discussions
+    - |
+      [ -s review.json ] || exit 0
+      API_BASE="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}"
+      TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+      HEAD_SHA=$(git rev-parse HEAD)
+      BASE_SHA=$(git merge-base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)
+
+      EMOJI_MAP='{"critical":"🔴","warning":"🟡","suggestion":"💡","praise":"✅"}'
+
+      if command -v jq > /dev/null 2>&1; then
+        jq -c --arg base "$BASE_SHA" --arg head "$HEAD_SHA" --argjson em "$EMOJI_MAP" \
+          '.comments[] | select(.path != "" and .line > 0) |
+          { body: (($em[.severity] // "💡") + " **" + .severity + "**: " + .body),
+            path: .path, line: .line, base: $base, head: $head }' review.json | while IFS= read -r item; do
+          CPATH=$(echo "$item" | jq -r '.path')
+          CLINE=$(echo "$item" | jq -r '.line')
+          CBODY=$(echo "$item" | jq -r '.body')
+          curl -sf -X POST -H "PRIVATE-TOKEN: $TOKEN" \
+            --data-urlencode "body=$CBODY" \
+            --data-urlencode "position[base_sha]=$BASE_SHA" \
+            --data-urlencode "position[head_sha]=$HEAD_SHA" \
+            --data-urlencode "position[start_sha]=$BASE_SHA" \
+            --data-urlencode "position[position_type]=text" \
+            --data-urlencode "position[new_path]=$CPATH" \
+            --data-urlencode "position[new_line]=$CLINE" \
+            "$API_BASE/discussions" > /dev/null || echo "Warn: comment on $CPATH:$CLINE skipped"
+        done
+      else
+        echo "jq not available; per-file inline comments skipped."
+      fi

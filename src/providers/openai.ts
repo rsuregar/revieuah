@@ -40,7 +40,7 @@ export class OpenAIProvider implements Provider {
       ]
     });
 
-    const markdown = response.choices[0]?.message?.content?.trim() ?? "";
+      const markdown = response.choices?.[0]?.message?.content?.trim() ?? "";
     const risk = extractRiskLevel(markdown);
 
     return { markdown, risk };
