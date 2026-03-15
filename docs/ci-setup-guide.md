@@ -131,6 +131,8 @@ Create a new branch, change any file, and open a Pull Request. Within a few minu
 |-----|-------|-----------|--------|
 | `REVIUAH_API_KEY` | Your API key | ✅ | ✅ |
 | `GITLAB_TOKEN` | Personal or project token with `api` scope | ✅ | ✅ |
+| `REVIUAH_PROVIDER` | *(optional)* e.g. `gemini`, `openai`, `agentrouter` | — | — |
+| `REVIUAH_MODEL` | *(optional)* e.g. `gpt-4o`, `gemini-2.0` | — | — |
 
 > **GITLAB_TOKEN** is required to post comments on MRs. Create it under **User Settings → Access Tokens** (personal) or **Project → Settings → Access Tokens** (project).  
 > Required scope: `api`.
@@ -215,17 +217,32 @@ Create a new branch, make changes, and open a Merge Request. The review comment 
 
 ## Optional Configuration
 
-### Change Provider
+### Different provider/model per repo
 
-Default: `agentrouter`. Override by adding an env variable:
+Setiap repo bisa memakai **provider dan model berbeda** lewat variable (tanpa ubah kode workflow).
+
+**GitHub Actions**  
+- Buka repo → **Settings** → **Secrets and variables** → **Actions** → tab **Variables**.  
+- Tambah variable: `REVIUAH_PROVIDER`, `REVIUAH_MODEL`.  
+- Workflow `code-review.yml` sudah baca `vars.REVIUAH_PROVIDER` dan `vars.REVIUAH_MODEL`; kalau tidak di-set, provider default = `gemini`.
+
+**GitLab CI**  
+- Buka repo → **Settings** → **CI/CD** → **Variables**.  
+- Tambah variable: `REVIUAH_PROVIDER`, `REVIUAH_MODEL`.  
+- Variable CI/CD otomatis tersedia di job; ReviuAh baca dari environment.
+
+**Contoh:**
 
 ```yaml
-# Example: use Gemini
+# Repo A: pakai Gemini
 REVIUAH_PROVIDER: gemini
+REVIUAH_MODEL: gemini-2.0
 
-# Example: use OpenAI
+# Repo B: pakai OpenAI
 REVIUAH_PROVIDER: openai
 REVIUAH_MODEL: gpt-4o
+
+# Repo C: pakai AgentRouter (default), tidak perlu set variable
 ```
 
 ### Limit Diff Size

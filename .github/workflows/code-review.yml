@@ -39,6 +39,7 @@ jobs:
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
+          REVIUAH_MODEL: ${{ vars.REVIUAH_MODEL }}
           REVIUAH_MAX_DIFF_SIZE: 60000
 
       - name: Run per-file review
@@ -47,6 +48,7 @@ jobs:
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
+          REVIUAH_MODEL: ${{ vars.REVIUAH_MODEL }}
           REVIUAH_MAX_DIFF_SIZE: 60000
 
       # 3. Post overall summary as PR comment (create or update)
