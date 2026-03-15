@@ -1,10 +1,22 @@
 import OpenAI from "openai";
 import type {
+  PerFileReviewResponse,
   Provider,
   ReviewRequest,
   ReviewResponse,
   RiskLevel,
 } from "./index.js";
+import { buildPerFilePrompt, parsePerFileResponse } from "./per-file-prompt.js";
+
+function messageForStatus(status: number): string {
+  switch (status) {
+    case 401: return "Authentication failed (401). Check your API key.";
+    case 403: return "Forbidden (403). API key does not have access.";
+    case 404: return "Not found (404). Check model name or endpoint URL.";
+    case 429: return "Rate limit exceeded (429). Try again later.";
+    default: return `Request failed (${status}).`;
+  }
+}
 
 export interface OpenAIProviderOptions {
   apiKey: string;
@@ -23,7 +35,6 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     baseURL: "https://api.anthropic.com/v1",
     defaultModel: "claude-sonnet-4-5",
   },
-  /** OpenAI-compatible; native API is .../v1beta/models/gemini-flash-latest:generateContent */
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     defaultModel: "gemini-flash-latest",
@@ -149,6 +160,30 @@ export class OpenAIProvider implements Provider {
     const risk = extractRiskLevel(markdown);
 
     return { markdown, risk };
+  }
+
+  async reviewPerFile(request: ReviewRequest): Promise<PerFileReviewResponse> {
+    const { system, user } = buildPerFilePrompt(request);
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      });
+
+      const raw = response.choices[0]?.message?.content?.trim() ?? "{}";
+      return parsePerFileResponse(raw);
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (typeof status === "number") {
+        throw new Error(messageForStatus(status));
+      }
+      throw err;
+    }
   }
 
   private buildPrompt(request: ReviewRequest): string {

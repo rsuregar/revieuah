@@ -1,69 +1,85 @@
-# Copy this file to your GitLab repo as .gitlab-ci.yml (or include it).
-# Required CI/CD variables (Settings > CI/CD > Variables):
-#   REVIUAH_API_KEY  — your LLM API key
-#   GITLAB_TOKEN     — GitLab personal/project access token with api scope (or use CI_JOB_TOKEN)
+# ReviuAh GitLab CI — auto review + comment on MR
+# Copy to your repo as .gitlab-ci.yml (or include it).
 #
-# Optional variables:
-#   REVIUAH_PROVIDER_URL  — override provider URL
-#   REVIUAH_MAX_DIFF_SIZE — max diff chars (default 120000)
+# Required CI/CD variables (Settings > CI/CD > Variables):
+#   REVIUAH_API_KEY  — LLM API key
+#   GITLAB_TOKEN     — personal/project token with scope: api
+#
+# Optional:
+#   REVIUAH_PROVIDER_URL, REVIUAH_MAX_DIFF_SIZE
 
 stages:
   - review
 
 code-review:
   stage: review
-  image: node:20
+  image: node:22
   only:
     - merge_requests
   variables:
     GIT_DEPTH: 0
+  before_script:
+    - apt-get update -qq && apt-get install -yqq jq > /dev/null 2>&1 || true
   script:
-    - npm install -g reviuah
+    - npm install -g reviuah@latest
 
-    # Run review and save output
-    - >
-      reviuah
-      --range origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD
-      --out review.md
-      --lang en
-      || true
+    # Overall summary
+    - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --out review.md --lang en || true
 
-    # Post comment on MR (update existing or create new)
+    # Per-file inline comments
+    - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --per-file --out review.json --lang en || true
+
+    # Post/update summary note on MR
     - |
-      if [ ! -s review.md ]; then
-        echo "No review output, skipping comment."
-        exit 0
-      fi
-
+      [ -s review.md ] || exit 0
       API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
       TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
       MARKER="<!-- reviuah-review -->"
 
-      # Check for existing comment
-      EXISTING_ID=$(curl -sf --header "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
-        | python3 -c "
-      import json, sys
-      notes = json.load(sys.stdin)
-      for n in notes:
-          if '$MARKER' in n.get('body',''):
-              print(n['id'])
-              break
-      " 2>/dev/null || true)
+      if command -v jq > /dev/null 2>&1; then
+        EXISTING_ID=$(curl -sf -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
+          | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))][0].id // empty')
+      else
+        EXISTING_ID=$(curl -sf -H "PRIVATE-TOKEN: $TOKEN" "$API_URL?per_page=100" \
+          | python3 -c "import json,sys;[print(n['id']) or exit() for n in json.load(sys.stdin) if '$MARKER' in n.get('body','')]" 2>/dev/null || true)
+      fi
 
-      REVIEW_BODY=$(cat review.md)
-      COMMENT_BODY="$MARKER
-      # 🔍 ReviuAh — AI Code Review
-
-      $REVIEW_BODY"
+      BODY=$(printf '%s\n# 🔍 ReviuAh — AI Code Review\n\n%s' "$MARKER" "$(cat review.md)")
 
       if [ -n "$EXISTING_ID" ]; then
-        curl -sf --request PUT --header "PRIVATE-TOKEN: $TOKEN" \
-          --data-urlencode "body=$COMMENT_BODY" \
-          "$API_URL/$EXISTING_ID" > /dev/null
-        echo "Updated existing review comment."
+        curl -sf -X PUT -H "PRIVATE-TOKEN: $TOKEN" --data-urlencode "body=$BODY" "$API_URL/$EXISTING_ID" > /dev/null
       else
-        curl -sf --request POST --header "PRIVATE-TOKEN: $TOKEN" \
-          --data-urlencode "body=$COMMENT_BODY" \
-          "$API_URL" > /dev/null
-        echo "Posted new review comment."
+        curl -sf -X POST -H "PRIVATE-TOKEN: $TOKEN" --data-urlencode "body=$BODY" "$API_URL" > /dev/null
+      fi
+
+    # Post per-file inline comments as MR discussions
+    - |
+      [ -s review.json ] || exit 0
+      API_BASE="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}"
+      TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+      HEAD_SHA=$(git rev-parse HEAD)
+      BASE_SHA=$(git merge-base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)
+
+      EMOJI_MAP='{"critical":"🔴","warning":"🟡","suggestion":"💡","praise":"✅"}'
+
+      if command -v jq > /dev/null 2>&1; then
+        jq -c --arg base "$BASE_SHA" --arg head "$HEAD_SHA" --argjson em "$EMOJI_MAP" \
+          '.comments[] | select(.path != "" and .line > 0) |
+          { body: (($em[.severity] // "💡") + " **" + .severity + "**: " + .body),
+            path: .path, line: .line, base: $base, head: $head }' review.json | while IFS= read -r item; do
+          CPATH=$(echo "$item" | jq -r '.path')
+          CLINE=$(echo "$item" | jq -r '.line')
+          CBODY=$(echo "$item" | jq -r '.body')
+          curl -sf -X POST -H "PRIVATE-TOKEN: $TOKEN" \
+            --data-urlencode "body=$CBODY" \
+            --data-urlencode "position[base_sha]=$BASE_SHA" \
+            --data-urlencode "position[head_sha]=$HEAD_SHA" \
+            --data-urlencode "position[start_sha]=$BASE_SHA" \
+            --data-urlencode "position[position_type]=text" \
+            --data-urlencode "position[new_path]=$CPATH" \
+            --data-urlencode "position[new_line]=$CLINE" \
+            "$API_BASE/discussions" > /dev/null || echo "Warn: comment on $CPATH:$CLINE skipped"
+        done
+      else
+        echo "jq not available; per-file inline comments skipped."
       fi

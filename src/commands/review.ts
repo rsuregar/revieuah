@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { execa } from "execa";
 import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
-import type { ReviewResponse } from "../providers/index.js";
+import type { PerFileReviewResponse, ReviewResponse } from "../providers/index.js";
 import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
 import { printBanner } from "../ui/logo.js";
@@ -28,6 +28,8 @@ export interface ReviewCommandOptions {
   lang: string;
   /** Write review markdown to this path instead of only stdout. */
   out?: string;
+  /** Per-file mode: output JSON with inline comments instead of a single markdown blob. */
+  perFile?: boolean;
 }
 
 export async function reviewCommand(
@@ -77,6 +79,32 @@ export async function reviewCommand(
 
   printBanner();
   const stopSpinner = startSpinner("Reviewing");
+
+  if (options.perFile && provider.reviewPerFile) {
+    let perFileResult: PerFileReviewResponse;
+    try {
+      perFileResult = await provider.reviewPerFile({
+        diff: trimmedDiff,
+        language: options.lang,
+      });
+    } finally {
+      stopSpinner();
+    }
+
+    const json = JSON.stringify(perFileResult, null, 2);
+    if (options.out) {
+      const absolute = resolve(process.cwd(), options.out);
+      const parent = dirname(absolute);
+      try { await mkdir(parent, { recursive: true }); } catch { /* ok */ }
+      await writeFile(absolute, json, "utf8");
+      console.error(`ReviuAh: per-file review written to ${options.out}`);
+    } else {
+      console.log(json);
+    }
+
+    return { markdown: perFileResult.summary, risk: perFileResult.risk };
+  }
+
   let result: ReviewResponse;
   try {
     result = await provider.review({

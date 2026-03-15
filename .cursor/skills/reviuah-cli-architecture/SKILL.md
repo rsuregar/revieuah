@@ -2,37 +2,45 @@
 name: reviuah-cli-architecture
 description: >-
   Use when changing the ReviuAh Node CLI entrypoint, Commander flags, git diff
-  sources (staged/commit/range), or wiring between cli.ts, review command, and
-  git/diff.ts.
+  sources, commands, or wiring between cli.ts, review command, and git/diff.ts.
 ---
 
 # ReviuAh CLI architecture
 
 ## Flow
 
-1. **`src/cli.ts`** — Commander program: `--commit`, `--range`, `--strict`, `--lang`. Parses argv and calls `reviewCommand`.
-2. **`src/commands/review.ts`** — Ensures git repo, resolves diff via `resolveDiff`, trims size, instantiates provider, prints markdown, returns `{ markdown, risk }`.
-3. **`src/git/diff.ts`** — `getStagedDiff`, `getCommitDiff`, `getRangeDiff` via `git` + execa.
+1. **`src/cli.ts`** — Commander program with subcommands (`setup`, `config`, `version`, `update`) and review flags (`--commit`, `--range`, `--base`, `--strict`, `--lang`, `--out`, `--per-file`).
+2. **`src/commands/review.ts`** — Ensures git repo, resolves diff, trims size, instantiates provider via `createProvider()`, runs review or per-file review, outputs result.
+3. **`src/git/diff.ts`** — `getStagedDiff`, `getCommitDiff`, `getRangeDiff` via `execa`.
 
 ## Rules
 
-- **Mutually exclusive**: `--commit` and `--range` must not both be set (enforced in `reviewCommand`).
-- **Empty diff**: Return fixed markdown + `risk: "unknown"`; do not call the API.
-- **Strict mode**: Only `cli.ts` should set `process.exitCode = 1` when `strict && risk === "high"`.
+- **Mutually exclusive**: only one diff mode allowed (`--commit`, `--range`, `--base`, or default staged).
+- **Empty diff**: return fixed markdown + `risk: "unknown"`; do NOT call the API.
+- **Strict mode**: only `cli.ts` sets `process.exitCode = 1` when `strict && risk === "high"`.
+- **stdout = user output only**: review content goes to stdout; status/debug to stderr.
 
-## Setup & config
+## Commands
 
-- **`reviuah setup`** — interactive write to `~/.reviuah/config.json` (apiKey, provider, model, providerUrl). File mode `0600` where supported.
-- **`reviuah config`** — print path and masked key status.
-- Review uses `resolveReviewCredentials()`: env overrides saved file.
+| Command | Purpose |
+|---------|---------|
+| `setup` | TUI wizard (blessed) or simple prompts → `~/.reviuah/config.json`. Flags: `--wizard`, `--no-wizard`. |
+| `config` | Print config path + masked key status. `--update` reopens setup. |
+| `version <type>` | Bump `package.json` version using `semver`. |
+| `update` | `yarn install` + `yarn build` (development convenience). |
 
-## Branch workflow
+## Config resolution
 
-- **`--base <ref>`** → `getRangeDiff(\`${ref}...HEAD\`)` (sama semantik dengan `git diff base...HEAD`).
-- Hanya satu mode diff: staged (default), `--commit`, `--range`, atau `--base`.
+`resolveReviewCredentials()` in `src/config/user-config.ts`: env vars (`REVIUAH_*`) override saved file. Provider defaults in `openai.ts` `PROVIDER_TEMPLATES`.
 
-## Extending the CLI
+## Review modes
 
-- New flags: add to Commander in `cli.ts`, extend `ReviewCommandOptions` in `review.ts`, thread through `resolveDiff` or provider as needed.
-- New diff modes: add a function in `diff.ts` and a branch in `resolveDiff`.
-- Keep **stdout** as the primary review output for piping/CI unless adding an explicit `--out` (if README promises it, implement consistently).
+- **Summary** (default): single markdown blob via `provider.review()`.
+- **Per-file** (`--per-file`): JSON with inline comments via `provider.reviewPerFile()`. Used by CI to post inline PR/MR comments.
+
+## Extending
+
+- New flags → add to Commander in `cli.ts`, extend `ReviewCommandOptions`, thread through.
+- New diff modes → add function in `diff.ts`, add branch in `resolveDiff`.
+- New commands → create `src/commands/<name>.ts`, register in `cli.ts`.
+- Shared utils → `src/lib/` (e.g. `package-root.ts`).

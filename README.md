@@ -20,7 +20,7 @@ yarn global add reviuah
 pnpm add -g reviuah
 ```
 
-**Requirements:** Node.js 18+, Git. Commands: `reviuah` or `reviewah` (same).
+**Requirements:** Node.js 20+, Git. Commands: `reviuah` or `reviewah` (same).
 
 ---
 
@@ -88,6 +88,7 @@ The CLI prints structured Markdown:
 | `REVIUAH_PROVIDER_URL` | Override API base URL |
 | `REVIUAH_MODEL` | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
+| `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000). |
 
 Env overrides saved config (useful for CI).
 
@@ -121,9 +122,9 @@ jobs:
           fetch-depth: 0            # full history for diff
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm install -g reviuah
-      - run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md
+      - run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --out review.md
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
       - name: Comment on PR

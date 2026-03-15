@@ -79,6 +79,7 @@ program
   .option("--strict", "exit with code 1 when risk level is high", false)
   .option("--lang <lang>", "output language", "en")
   .option("--out <file>", "write review markdown to file")
+  .option("--per-file", "output per-file inline comments as JSON (for CI integration)", false)
   .action(
     async (options: {
       commit?: string;
@@ -87,6 +88,7 @@ program
       strict?: boolean;
       lang?: string;
       out?: string;
+      perFile?: boolean;
     }) => {
       const result = await reviewCommand({
         commit: options.commit,
@@ -95,6 +97,7 @@ program
         strict: Boolean(options.strict),
         lang: options.lang ?? "en",
         out: options.out,
+        perFile: Boolean(options.perFile),
       });
 
       if (options.strict && result.risk === "high") {

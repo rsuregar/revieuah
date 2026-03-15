@@ -2,6 +2,10 @@
 
 ReviuAh bisa dipasang di repo mana saja (GitHub atau GitLab) agar **otomatis review dan komentar** di setiap Pull Request / Merge Request.
 
+**Dua mode review:**
+- **Summary** — satu komentar ringkasan keseluruhan di PR/MR.
+- **Per-file** (`--per-file`) — komentar inline langsung di baris kode yang bermasalah, seperti reviewer manusia.
+
 ---
 
 ## Persiapan (Semua Platform)
@@ -60,8 +64,8 @@ jobs:
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
-          # Ganti provider URL sesuai kebutuhan (contoh: Gemini native)
-          # REVIUAH_PROVIDER_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent
+          # Ganti provider sesuai kebutuhan (contoh: Gemini)
+          # REVIUAH_PROVIDER: gemini
           # Batas ukuran diff (opsional, default 120000)
           # REVIUAH_MAX_DIFF_SIZE: 60000
 
@@ -214,8 +218,8 @@ Buat branch baru, ubah file, buat Merge Request. Komentar review akan muncul di 
 Default: `agentrouter`. Ganti dengan menambah env variable:
 
 ```yaml
-# Contoh: pakai Gemini native (hemat token)
-REVIUAH_PROVIDER_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent
+# Contoh: pakai Gemini
+REVIUAH_PROVIDER: gemini
 
 # Contoh: pakai OpenAI
 REVIUAH_PROVIDER: openai
