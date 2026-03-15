@@ -12,6 +12,7 @@ jobs:
       pull-requests: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
       REVIUAH_ENABLE_SUMMARY: ${{ vars.REVIUAH_ENABLE_SUMMARY || '1' }}
     steps:
       - name: Checkout code
@@ -30,19 +31,17 @@ jobs:
 
       # Skip review steps for fork PRs (no access to secrets)
       - name: Run overall review
-        if: secrets.REVIUAH_API_KEY != '' && env.REVIUAH_ENABLE_SUMMARY != '0'
+        if: env.REVIUAH_API_KEY != '' && env.REVIUAH_ENABLE_SUMMARY != '0'
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
-          REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
           REVIUAH_MODEL: ${{ vars.REVIUAH_MODEL }}
           REVIUAH_MAX_DIFF_SIZE: 60000
 
       - name: Run per-file review
-        if: secrets.REVIUAH_API_KEY != ''
+        if: env.REVIUAH_API_KEY != ''
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
         env:
-          REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
           REVIUAH_MODEL: ${{ vars.REVIUAH_MODEL }}
           REVIUAH_MAX_DIFF_SIZE: 60000
