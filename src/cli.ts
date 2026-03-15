@@ -7,6 +7,8 @@ import { dirname, join } from "node:path";
 import { reviewCommand } from "./commands/review.js";
 import { setupCommand } from "./commands/setup.js";
 import { configStatusCommand } from "./commands/config-status.js";
+import { updateCommand } from "./commands/update.js";
+import { versionBumpCommand } from "./commands/version-bump.js";
 import { checkForUpdates } from "./lib/check-update.js";
 
 function readPkgVersion(): string {
@@ -45,6 +47,26 @@ program
   .description("Tampilkan lokasi file config dan status API key")
   .action(async () => {
     await configStatusCommand();
+  });
+
+program
+  .command("update")
+  .description("Update dependensi lalu build ulang (untuk development / setelah pull)")
+  .action(async () => {
+    await updateCommand();
+  });
+
+program
+  .command("version <type>", { hidden: false })
+  .description("Bump version: patch (bugfix), minor (fitur baru), major (breaking)")
+  .action(async (type: string) => {
+    const t = type?.toLowerCase();
+    if (t !== "patch" && t !== "minor" && t !== "major") {
+      console.error("Pakai: reviuah version patch | minor | major");
+      process.exitCode = 1;
+      return;
+    }
+    await versionBumpCommand(t as "patch" | "minor" | "major");
   });
 
 program

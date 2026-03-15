@@ -1,6 +1,6 @@
 {
   "name": "reviuah",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered Git diff reviewer CLI — staged, branch vs base, CI-friendly",
   "license": "MIT",
   "author": "rsuregar",
@@ -33,6 +33,9 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
     "start": "node dist/cli.js",
+    "version:patch": "node scripts/bump-version.mjs patch",
+    "version:minor": "node scripts/bump-version.mjs minor",
+    "version:major": "node scripts/bump-version.mjs major",
     "prepublishOnly": "npm run build",
     "prepare": "node -e \"const f=require('fs');const{execSync}=require('child_process');if(f.existsSync('tsconfig.json')&&f.existsSync('src'))execSync('npm run build',{stdio:'inherit'})\""
   },

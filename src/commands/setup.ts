@@ -27,12 +27,20 @@ export async function setupCommand(): Promise<void> {
   const existing = await readUserConfig();
   const path = getUserConfigPath();
 
-  if (input.isTTY && output.isTTY) {
-    const saved = await new SetupWizard(existing).run();
-    if (saved) {
-      console.error("\nSelesai. Coba: reviuah (review staged) atau reviuah --base main");
+  // Prefer full-screen wizard when stdin is TTY (interactive); stdout must be TTY for blessed to draw.
+  const useWizard = input.isTTY && output.isTTY;
+  if (useWizard) {
+    try {
+      const saved = await new SetupWizard(existing).run();
+      if (saved) {
+        console.error("\nSelesai. Coba: reviuah (review staged) atau reviuah --base main");
+      }
+      return;
+    } catch (err) {
+      console.error("Wizard error, falling back to simple prompts:", err);
     }
-    return;
+  } else if (input.isTTY) {
+    console.error("Tip: jalankan reviuah setup di terminal langsung (bukan via pipe) untuk form penuh.\n");
   }
 
   console.error("ReviuAh setup — menyimpan konfigurasi di:");
