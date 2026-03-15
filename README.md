@@ -53,13 +53,13 @@ reviuah --base main --prompt "Focus on security and SQL injection risks."
 
 ## Usage
 
-| Scenario | Command |
-|----------|---------|
-| Staged changes only | `reviuah` |
-| Specific commit | `reviuah --commit HEAD` |
-| Git range | `reviuah --range main...HEAD` |
-| Current branch vs base | `reviuah --base main` |
-| Fail CI if high risk | `reviuah --base origin/main --strict` |
+| Scenario               | Command                               |
+| ---------------------- | ------------------------------------- |
+| Staged changes only    | `reviuah`                             |
+| Specific commit        | `reviuah --commit HEAD`               |
+| Git range              | `reviuah --range main...HEAD`         |
+| Current branch vs base | `reviuah --base main`                 |
+| Fail CI if high risk   | `reviuah --base origin/main --strict` |
 
 **Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high), `--summary` / `--no-summary`, `--prompt <text>` (custom instructions for the reviewer). Run `reviuah --help` for full list.
 
@@ -71,30 +71,30 @@ After a review run, if a newer version is available on npm, ReviuAh prints a one
 
 The CLI prints structured Markdown:
 
-1. Summary  
-2. Risk Level (low / medium / high / unknown) + reason  
-3. Security Review  
-4. Performance Review  
-5. Testing Suggestions  
-6. Code Quality & Maintainability  
-7. Actionable Suggestions  
+1. Summary
+2. Risk Level (low / medium / high / unknown) + reason
+3. Security Review
+4. Performance Review
+5. Testing Suggestions
+6. Code Quality & Maintainability
+7. Actionable Suggestions
 
 ---
 
 ## Environment variables
 
-| Variable | Description |
-|----------|-------------|
-| `REVIUAH_API_KEY` | **Required** for API calls |
-| `REVIUAH_PROVIDER` | Preset: `agentrouter`, `openai`, `gemini`, `deepseek`, `ollama`, etc. Default: `agentrouter` |
-| `REVIUAH_PROVIDER_URL` | Override API base URL |
-| `REVIUAH_MODEL` | Override model name |
-| `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
-| `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000). |
-| `REVIUAH_ENABLE_SUMMARY` | Set to `0` / `false` to disable summary markdown generation (same effect as `--no-summary`). Default enabled. |
-| `REVIUAH_COMPACT` | Set to `1` or `true` for minimal review output (fewer sections, lower token usage). Same as `--compact`. |
-| `REVIUAH_MAX_OUTPUT_TOKENS` | Cap completion length (e.g. `2000`). Reduces output tokens; may truncate long reviews. |
-| `REVIUAH_CUSTOM_PROMPT` | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
+| Variable                     | Description                                                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `REVIUAH_API_KEY`            | **Required** for API calls                                                                                        |
+| `REVIUAH_PROVIDER`           | Preset: `agentrouter`, `openai`, `gemini`, `deepseek`, `ollama`, etc. Default: `agentrouter`                      |
+| `REVIUAH_PROVIDER_URL`       | Override API base URL                                                                                             |
+| `REVIUAH_MODEL`              | Override model name                                                                                               |
+| `REVIUAH_MAX_DIFF_SIZE`      | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper.                          |
+| `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000).                                                     |
+| `REVIUAH_ENABLE_SUMMARY`     | Set to `0` / `false` to disable summary markdown generation (same effect as `--no-summary`). Default enabled.     |
+| `REVIUAH_COMPACT`            | Set to `1` or `true` for minimal review output (fewer sections, lower token usage). Same as `--compact`.          |
+| `REVIUAH_MAX_OUTPUT_TOKENS`  | Cap completion length (e.g. `2000`). Reduces output tokens; may truncate long reviews.                            |
+| `REVIUAH_CUSTOM_PROMPT`      | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
 
 **Reducing token usage:** Use `--compact` or `REVIUAH_COMPACT=1` for shorter reviews. Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length.
 
@@ -126,11 +126,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write          # needed to post comments
+      pull-requests: write # needed to post comments
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0            # full history for diff
+          fetch-depth: 0 # full history for diff
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -172,6 +172,8 @@ jobs:
 2. (Optional) Add `REVIUAH_ENABLE_SUMMARY=0` to skip summary note and run per-file only.
 3. Copy `.gitlab-ci-review.yml` to your repo as `.gitlab-ci.yml` (or `include` it). It installs ReviuAh from npm (works in any repo).
 4. Every MR will get a note with the AI review.
+
+**CLI works but CI doesn’t?** Check token permissions: [CI setup guide — GitLab token permissions](docs/ci-setup-guide.md#gitlab-token-permissions-and-why-ci-might-fail-cli-works-ci-doesnt) (e.g. **Protected** variables, **GITLAB_TOKEN** must be set with `api` scope).
 
 **CLI works but CI doesn’t?** Check token permissions: [CI setup guide — GitLab token permissions](docs/ci-setup-guide.md#gitlab-token-permissions-and-why-ci-might-fail-cli-works-ci-doesnt) (e.g. **Protected** variables, **GITLAB_TOKEN** must be set with `api` scope).
 
