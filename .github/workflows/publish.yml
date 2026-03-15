@@ -1,10 +1,12 @@
 name: Publish to npm
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version_type:
-        description: "Version bump type"
+        description: "Version bump type (untuk manual publish)"
         required: true
         type: choice
         options:
@@ -12,12 +14,19 @@ on:
           - minor
           - major
 
+# Jangan jalankan lagi setelah push hasil version bump (hindari loop)
 permissions:
   contents: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Saat push ke main: jalankan hanya jika commit BUKAN hasil version bump
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    env:
+      VERSION_BUMP: ${{ github.event.inputs.version_type || 'patch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,7 +55,7 @@ jobs:
 
       - name: Bump version and publish
         run: |
-          npm version ${{ inputs.version_type }} -m "chore: release %s [skip ci]"
+          npm version ${{ env.VERSION_BUMP }} -m "chore: release %s [skip ci]"
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

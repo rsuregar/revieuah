@@ -1,8 +1,10 @@
-import { writeFile } from "node:fs/promises";
+import { writeFile, access, mkdir, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { execa } from "execa";
 import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
-import { OpenAIProvider } from "../providers/openai.js";
 import type { ReviewResponse } from "../providers/index.js";
+import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
 
 const MAX_DIFF_SIZE = 120000;
@@ -22,6 +24,9 @@ export async function reviewCommand(
   options: ReviewCommandOptions,
 ): Promise<ReviewResponse> {
   await ensureGitRepository();
+  if (options.out) {
+    await validateOutPath(options.out);
+  }
 
   const diff = await resolveDiff(options);
 
@@ -56,13 +61,8 @@ export async function reviewCommand(
 
   const trimmedDiff = trimDiff(diff, MAX_DIFF_SIZE);
 
-  const { apiKey, baseURL, model } = await resolveReviewCredentials();
-
-  const provider = new OpenAIProvider({
-    apiKey,
-    baseURL,
-    model,
-  });
+  const credentials = await resolveReviewCredentials();
+  const provider = createProvider(credentials);
 
   const result = await provider.review({
     diff: trimmedDiff,
@@ -74,9 +74,57 @@ export async function reviewCommand(
   return result;
 }
 
+/**
+ * Ensures --out path is valid and writable. Throws with a clear message if not.
+ */
+async function validateOutPath(outPath: string): Promise<void> {
+  const absolute = resolve(process.cwd(), outPath);
+  const parent = dirname(absolute);
+
+  try {
+    await access(parent, constants.W_OK);
+  } catch (err) {
+    const code = err && typeof (err as NodeJS.ErrnoException).code === "string"
+      ? (err as NodeJS.ErrnoException).code
+      : "access denied";
+    if (code === "ENOENT") {
+      throw new Error(
+        `--out path invalid: directory does not exist: ${parent}. Create the directory or choose a different path.`,
+      );
+    }
+    throw new Error(
+      `--out path not writable: insufficient permissions for ${parent}. Check path and permissions.`,
+    );
+  }
+
+  try {
+    const st = await stat(absolute);
+    if (st.isFile()) {
+      await access(absolute, constants.W_OK);
+    }
+  } catch (err) {
+    const code = err && typeof (err as NodeJS.ErrnoException).code === "string"
+      ? (err as NodeJS.ErrnoException).code
+      : "";
+    if (code === "ENOENT") return; /* file doesn't exist yet; parent is writable */
+    if (code === "EACCES" || code === "EPERM") {
+      throw new Error(
+        `--out path not writable: cannot write to existing file ${absolute}. Check permissions.`,
+      );
+    }
+  }
+}
+
 async function outputReview(markdown: string, outPath?: string): Promise<void> {
   if (outPath) {
-    await writeFile(outPath, markdown, "utf8");
+    const absolute = resolve(process.cwd(), outPath);
+    const parent = dirname(absolute);
+    try {
+      await mkdir(parent, { recursive: true });
+    } catch {
+      /* already validated; ignore if dir exists */
+    }
+    await writeFile(absolute, markdown, "utf8");
     console.error(`ReviuAh: review written to ${outPath}`);
   } else {
     console.log(markdown);

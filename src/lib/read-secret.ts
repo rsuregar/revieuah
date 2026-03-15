@@ -11,8 +11,10 @@ export async function readSecretLine(prompt: string): Promise<string> {
   if (!stdin.isTTY) {
     const rl = readline.createInterface({ input: stdin, output: stdout });
     try {
-      stdout.write(`${prompt}(piped input — key will be visible)\n`);
-      return (await rl.question("API key: ")).trim();
+      stdout.write(
+        `Reading from piped input — your API key will be visible. ${prompt}`,
+      );
+      return (await rl.question("")).trim();
     } finally {
       rl.close();
     }
@@ -25,7 +27,7 @@ export async function readSecretLine(prompt: string): Promise<string> {
     } catch {
       stdin.setRawMode(false);
       const rl = createInterface({ input: stdin, output: stdout });
-      rl.question("API key (visible): ", (answer: string) => {
+      rl.question("API key (typed characters will be visible): ", (answer: string) => {
         rl.close();
         resolve(answer.trim());
       });

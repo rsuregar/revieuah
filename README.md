@@ -7,19 +7,33 @@
 
 ## Install
 
-Setelah [dipublish ke npm](https://www.npmjs.com/package/reviuah) (nama paket: `reviuah`):
+### Kalau `npm install -g reviuah` error 404
+
+Paket ini **belum dipublish** ke [npm](https://www.npmjs.com/package/reviuah) (atau namanya belum kamu ambil). Pakai salah satu di bawah.
+
+**Dari GitHub (global, build otomatis saat install):**
 
 ```bash
-# Global (pilih salah satu)
-npm install -g reviuah
-yarn global add reviuah
-pnpm add -g reviuah
-
-# Tanpa install global (npx / pnpx / yarn dlx)
-npx reviuah --help
-pnpm dlx reviuah --help
-yarn dlx reviuah --help
+npm install -g git+https://github.com/rsuregar/reviewah.git
 ```
+
+**Lokal (clone):**
+
+```bash
+git clone https://github.com/rsuregar/reviewah.git && cd reviewah
+npm install
+npm run build
+npm link
+```
+
+### Setelah publish ke npm
+
+```bash
+npm install -g reviuah
+# atau: yarn global add reviuah / pnpm add -g reviuah
+```
+
+Publish: login `npm login`, lalu di repo `npm publish --access public` (butuh akun npm & nama `reviuah` belum dipakai orang lain).
 
 **Perintah:** `reviuah` atau **`reviewah`** (alias sama).
 
@@ -146,6 +160,8 @@ src/
 
 ## CI (GitHub Actions)
 
+**Why `fetch-depth: 0`:** ReviuAh needs the base branch (e.g. `origin/main`) to compute `git diff base...HEAD`. The default shallow clone only fetches the single commit; `fetch-depth: 0` fetches full history so the diff works correctly.
+
 ```yaml
 name: AI Review
 on: [pull_request]
@@ -183,7 +199,9 @@ yarn link          # lokal: perintah reviuah / reviewah dari repo ini
 reviuah --help
 ```
 
-Publish manual: `npm publish --access public` (setelah `yarn build` dan login npm).
+**Publish manual:** `npm publish --access public` (setelah `yarn build` dan login npm).
+
+**Publish lewat GitHub Actions (saat merge ke main):** Workflow **Publish to npm** otomatis jalan setiap **push ke branch `main`** (termasuk setelah merge PR): build → bump **patch** → publish ke npm → push commit + tag ke repo. Pastikan secret **`NPM_TOKEN`** (token npm dengan izin publish / bypass 2FA) sudah ditambah di repo → Settings → Secrets → Actions. Commit hasil bump pakai pesan `chore: release X.Y.Z [skip ci]` agar workflow tidak jalan lagi (hindari loop).
 
 ---
 

@@ -1,3 +1,4 @@
+import select from "@inquirer/select";
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
@@ -55,10 +56,20 @@ export async function setupCommand(): Promise<void> {
     }
   }
 
-  const ids = listProviderIds().join(", ");
+  const providerIds = listProviderIds();
   const defaultProv = existing?.provider?.trim() || "agentrouter";
-  const provInput = await question(`Provider (${ids})`, defaultProv);
-  const provider = provInput.toLowerCase() || defaultProv;
+  let provider: string;
+  try {
+    provider = await select({
+      message: "Pilih provider (↑/↓ pilih, Enter konfirmasi)",
+      choices: providerIds.map((id) => ({ name: id, value: id })),
+      default: defaultProv,
+    });
+  } catch {
+    provider =
+      (await question(`Provider (${providerIds.join(", ")})`, defaultProv))
+        .toLowerCase() || defaultProv;
+  }
   const defaults = resolveProviderDefaults(provider);
 
   const rl2 = readline.createInterface({ input, output });
