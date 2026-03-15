@@ -2,6 +2,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
+import semver from "semver";
 
 const type = process.argv[2] || "patch";
 if (!["patch", "minor", "major"].includes(type)) {
@@ -12,14 +13,19 @@ if (!["patch", "minor", "major"].includes(type)) {
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const pkgPath = join(root, "package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-const [major, minor, patch] = (pkg.version || "0.0.0").replace(/^v/, "").split(".").map(Number);
+const current = (pkg.version || "0.0.0").replace(/^v/, "");
 
-let next;
-if (type === "major") next = `${(major || 0) + 1}.0.0`;
-else if (type === "minor") next = `${major || 0}.${(minor || 0) + 1}.0`;
-else next = `${major || 0}.${minor || 0}.${(patch || 0) + 1}`;
+if (!semver.valid(current)) {
+  console.error(`Invalid version in package.json: ${pkg.version}`);
+  process.exit(1);
+}
 
-const prev = pkg.version;
+const next = semver.inc(current, type);
+if (!next) {
+  console.error(`semver.inc failed for ${current} (${type})`);
+  process.exit(1);
+}
+
 pkg.version = next;
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
-console.log(`${prev} → ${next} (${type})`);
+console.log(`${current} → ${next} (${type})`);

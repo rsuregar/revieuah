@@ -1,6 +1,6 @@
 {
   "name": "reviuah",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "AI-powered Git diff reviewer CLI — staged, branch vs base, CI-friendly",
   "license": "MIT",
   "author": "rsuregar",
@@ -40,7 +40,7 @@
     "prepare": "node -e \"const f=require('fs');const{execSync}=require('child_process');if(f.existsSync('tsconfig.json')&&f.existsSync('src'))execSync('npm run build',{stdio:'inherit'})\""
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "blessed": "^0.1.81",
@@ -51,6 +51,7 @@
   "devDependencies": {
     "@types/blessed": "^0.1.27",
     "@types/node": "^25.3.3",
+    "semver": "^7.6.3",
     "typescript": "^5.6.3"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
