@@ -1,11 +1,14 @@
 # ReviuAh GitLab CI — auto review + comment on MR
 # Copy to your repo as .gitlab-ci.yml (or include it).
 #
+# You use YOUR OWN API key. Add it in your project's CI/CD variables (below).
 # Required CI/CD variables (Settings > CI/CD > Variables):
-#   REVIUAH_API_KEY  — LLM API key
+#   REVIUAH_API_KEY  — your LLM API key (Gemini, OpenAI, AgentRouter, etc.)
 #   GITLAB_TOKEN     — personal/project token with scope: api
 #
-# Optional:
+# Optional (each repo can use a different provider/model):
+#   REVIUAH_PROVIDER   — e.g. gemini, openai, agentrouter, deepseek (default: agentrouter)
+#   REVIUAH_MODEL      — e.g. gpt-4o, gemini-2.0, gemini-flash-latest
 #   REVIUAH_PROVIDER_URL, REVIUAH_MAX_DIFF_SIZE
 
 stages:
