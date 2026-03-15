@@ -41,6 +41,11 @@
   dependencies:
     undici-types "~5.26.4"
 
+"@types/semver@^6.0.0":
+  version "6.2.7"
+  resolved "https://registry.yarnpkg.com/@types/semver/-/semver-6.2.7.tgz#473fb8d63ea04f7511c699fb9b96830c51e8a53d"
+  integrity sha512-blctEWbzUFzQx799RZjzzIdBJOXmE37YYEyDtKkx5Dg+V7o/zyyAxLPiI98A2jdTtDgxZleMdfV+7p8WbRJ1OQ==
+
 abort-controller@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmjs.org/abort-controller/-/abort-controller-3.0.0.tgz"
