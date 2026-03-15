@@ -32,10 +32,10 @@ pnpm add -g reviuah
 reviuah setup
 ```
 
-Interactive setup saves config to `~/.reviuah/config.json`.  
-- **TUI tidak muncul?** Jalankan `reviuah setup --wizard` (paksa form penuh) atau gunakan terminal luar IDE.  
-- `reviuah setup --no-wizard` = prompt sederhana saja (untuk automation).  
-- **Ubah config lagi:** `reviuah config --update` atau `reviuah setup`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
+Interactive setup menyimpan ke `~/.reviuah/config.json`.  
+- **Default:** wizard (form TUI) bila terminal interaktif; bila gagal, otomatis pakai prompt sederhana.  
+- `reviuah setup --no-wizard` = langsung prompt sederhana (untuk automation/script).  
+- **Ubah config:** `reviuah config --update` atau `reviuah setup`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
 
 **2. Run a review:**
 

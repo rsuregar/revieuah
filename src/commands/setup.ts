@@ -36,9 +36,10 @@ export async function setupCommand(options?: SetupOptions): Promise<void> {
 
   const forceWizard = options?.wizard === true;
   const forceNoWizard = options?.noWizard === true;
-  const ttyWizard = input.isTTY && output.isTTY;
+  // Default: coba wizard bila stdin interaktif (TUI intuitif). Tanpa --no-wizard, selalu coba wizard dulu.
+  const useWizard =
+    forceWizard || (!forceNoWizard && input.isTTY);
 
-  const useWizard = forceWizard || (!forceNoWizard && ttyWizard);
   if (useWizard) {
     try {
       const saved = await new SetupWizard(existing).run();
@@ -47,10 +48,8 @@ export async function setupCommand(options?: SetupOptions): Promise<void> {
       }
       return;
     } catch (err) {
-      console.error("Wizard error, falling back to simple prompts:", err);
+      console.error("Wizard tidak tersedia, pakai prompt sederhana:", err instanceof Error ? err.message : err);
     }
-  } else if (input.isTTY && !forceNoWizard) {
-    console.error("Tip: gunakan reviuah setup --wizard untuk form penuh (TUI), atau jalankan di terminal luar IDE.\n");
   }
 
   console.error("ReviuAh setup — menyimpan konfigurasi di:");
