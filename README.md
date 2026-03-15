@@ -1,153 +1,153 @@
 # ReviuAh
 
-> AI-powered CLI tool to review Git diffs before commit or push.\
-> Designed for developers and AI agents.
+> AI-powered CLI to review Git diffs before commit or push.\
+> Install via **npm**, **yarn**, or **pnpm**; use on your branch with `--base` or `reviewah`.
 
 ---
 
-## Core Concept
+## Install
 
-ReviuAh analyzes Git diffs (staged changes, commits, or branch ranges)
-and generates structured code reviews using LLM providers such as
-OpenAI, Gemini, DeepSeek, or Ollama.
-
-Unlike commit message generators, ReviuAh: - Reads git diff - Sends the
-diff to an AI provider - Produces structured review output - Optionally
-fails CI if high risk is detected
-
----
-
-## CLI Commands
+Setelah [dipublish ke npm](https://www.npmjs.com/package/reviuah) (nama paket: `reviuah`):
 
 ```bash
-# Review staged changes
-reviuah
+# Global (pilih salah satu)
+npm install -g reviuah
+yarn global add reviuah
+pnpm add -g reviuah
 
-# Review specific commit
+# Tanpa install global (npx / pnpx / yarn dlx)
+npx reviuah --help
+pnpm dlx reviuah --help
+yarn dlx reviuah --help
+```
+
+**Perintah:** `reviuah` atau **`reviewah`** (alias sama).
+
+**Setup API key (disarankan):**
+
+```bash
+reviuah setup
+```
+
+Menyimpan key ke **`~/.reviuah/config.json`** (hanya di mesin kamu). Setelah itu cukup jalankan `reviuah` tanpa export env.
+
+**Atau** set env (mengoverride file): `REVIUAH_API_KEY`, opsional `REVIUAH_PROVIDER`, `REVIUAH_MODEL`, `REVIUAH_PROVIDER_URL`.
+
+```bash
+reviuah config   # cek lokasi file & apakah key sudah tersimpan
+```
+
+---
+
+## Inspirasi: [Commitah](https://github.com/utsmannn/commitah) vs ReviuAh
+
+[Commitah](https://github.com/utsmannn/commitah) pakai satu perintah CLI (`commitah`): analisis **perubahan yang sudah di-stage** → AI menghasilkan **pesan commit** (conventional commits, UI interaktif).
+
+**ReviuAh** memakai pola yang sama untuk input default:
+
+| | Commitah | ReviuAh |
+|---|----------|---------|
+| Perintah | `commitah` | `reviuah` (tanpa opsi) |
+| Sumber diff | Staged (`git add` dulu) | Sama |
+| Output | Saran commit message | **Review** (summary, risiko, security, testing, …) |
+
+Jadi: **Commitah** = “tulis commit message dari diff”; **ReviuAh** = “tinjau diff sebelum commit/push”. Keduanya bisa dipakai berurutan, misalnya `reviuah` dulu (cek kualitas), lalu `commitah` (pesan commit). Detail singkat: [docs/inspirasi-commitah.md](./docs/inspirasi-commitah.md).
+
+---
+
+## Cara pakai (alur branch)
+
+Typical flow: kamu sedang di **branch fitur**, ingin review selisih terhadap `main`:
+
+```bash
+git checkout feature/kerjaan-kamu
+export REVIUAH_API_KEY="sk-..."   # atau key provider lain
+
+# Review branch ini vs main (setara git diff main...HEAD)
+reviuah --base main
+
+# Kalau remote default beda nama branch
+reviuah --base origin/main
+
+# Simpan ke file (buka di editor / share ke PR)
+reviuah --base main --out review.md --lang id
+```
+
+| Skenario | Perintah |
+|----------|----------|
+| Hanya perubahan yang sudah **di-stage** | `reviuah` |
+| Satu **commit** | `reviuah --commit HEAD` |
+| Range manual | `reviuah --range main...HEAD` |
+| **Branch aktif** vs base | `reviuah --base main` |
+| CI: gagal jika risk **high** | `reviuah --base origin/main --strict` |
+
+**Tip:** di shell bisa alias supaya “satu klik” dari terminal:
+
+```bash
+alias reviewah='reviuah --base main --lang id'
+# lalu: reviewah
+```
+
+---
+
+## CLI (English)
+
+```bash
+reviuah --help
+reviuah --version
+
+reviuah                          # staged diff
 reviuah --commit HEAD
-
-# Review branch diff
-reviuah --range main...HEAD
-
-# Output to markdown file
+reviuah --range origin/main...HEAD
+reviuah --base main              # branch vs main
 reviuah --out review.md
-
-# Strict mode (exit 1 if high risk)
 reviuah --strict
-
-# Show configuration
-reviuah --config
-
-# Update configuration interactively
-reviuah --config-update
+reviuah --lang en
 ```
 
 ---
 
-## Required Review Output Structure
+## Required review output (Markdown)
 
-AI must return Markdown with the following sections:
-
-1.  Summary\
-2.  Risk Level (low / medium / high / unknown) + reasoning\
-3.  Security Review\
-4.  Performance Review\
-5.  Testing Suggestions\
-6.  Code Quality & Maintainability\
-7.  Actionable Suggestions (max N bullets)
+1. Summary  
+2. Risk Level (low / medium / high / unknown) + reason  
+3. Security Review  
+4. Performance Review  
+5. Testing Suggestions  
+6. Code Quality & Maintainability  
+7. Actionable Suggestions  
 
 ---
 
-## Architecture
+## Architecture (current)
 
-    src/
-      cli.ts
-      commands/
-        review.ts
-        config.ts
-      git/
-        diff.ts
-      providers/
-        index.ts
-        openai.ts
-        gemini.ts
-        deepseek.ts
-        ollama.ts
-      config/
-        load.ts
-        schema.ts
-      ui/
-        interactive.ts
-        render.ts
-
----
-
-## Configuration Example
-
-Default config file location:
-
-\~/.reviuahconfig-v1
-
-Example:
-
-```json
-{
-  "provider": "OpenAI",
-  "providerApiKey": "",
-  "providerUrl": "https://api.openai.com/v1",
-  "model": "gpt-4.1-mini",
-  "reviewSpec": "Focus on correctness, edge cases, security, and testing. Keep it concise.",
-  "maxDiffSize": 120000,
-  "language": "id"
-}
+```
+src/
+  cli.ts
+  commands/review.ts
+  git/diff.ts
+  providers/
+    index.ts
+    openai.ts
 ```
 
-Configuration priority order:
+---
 
-1.  CLI arguments
-2.  Environment variables
-3.  Project config (.reviuahrc)
-4.  Global config
-5.  Defaults
+## Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `REVIUAH_API_KEY` | Required for API calls |
+| `REVIUAH_PROVIDER` | Default preset: **`agentrouter`** → `https://agentrouter.org/v1`. Lainnya: `openai`, `gemini`, `deepseek`, `ollama`, … |
+| `REVIUAH_PROVIDER_URL` | Override base URL |
+| `REVIUAH_MODEL` | Override model (default untuk agentrouter: `gpt-4o`; sesuaikan di dashboard AgentRouter) |
 
 ---
 
-## Strict Mode Behavior
-
-If --strict is enabled:
-
-- If risk level = high
-- Exit with code 1
-- Otherwise exit 0
-
-This enables CI integration.
-
----
-
-## Environment Variables
-
-REVIUAH_PROVIDER\
-REVIUAH_API_KEY\
-REVIUAH_PROVIDER_URL\
-REVIUAH_MODEL\
-REVIUAH_SPEC
-
----
-
-## Security Considerations
-
-- Never log API keys
-- Truncate large diffs
-- Avoid sending secrets
-- Support local-only mode via Ollama
-
----
-
-## CI Example (GitHub Actions)
+## CI (GitHub Actions)
 
 ```yaml
 name: AI Review
-
 on: [pull_request]
 
 jobs:
@@ -155,39 +155,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - run: npm install -g reviuah
-      - run: reviuah --range origin/main...HEAD --strict
+      - run: reviuah --range origin/${{ github.base_ref }}...HEAD --strict
         env:
-          REVIUAH_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
 ```
 
+Untuk `pull_request`, checkout default adalah merge commit; untuk diff seperti di lokal, fetch branch dan gunakan `--base origin/main` atau `--range origin/main...HEAD` setelah checkout ke **head** PR (lihat [docs/cara-pakai.md](./docs/cara-pakai.md)).
+
 ---
+
+## For AI assistants
+
+- [AGENTS.md](./AGENTS.md) · [CLAUDE.md](./CLAUDE.md) · `.cursor/skills/`
 
 ## Development
 
 ```bash
-npm install
-npm run build
-npm link
+yarn install
+yarn build
+yarn link          # lokal: perintah reviuah / reviewah dari repo ini
+reviuah --help
 ```
 
----
-
-## Roadmap
-
-v1 - OpenAI provider - Staged diff review - Strict mode - Markdown
-output
-
-v2 - Multiple providers - Interactive UI - Project-level rule presets
-
-v3 - Patch suggestion mode - AI-assisted refactor mode - Review scoring
+Publish manual: `npm publish --access public` (setelah `yarn build` dan login npm).
 
 ---
 
-## Design Philosophy
+## Design philosophy
 
-ReviuAh is not: - A commit message generator - A code auto-modifier - A
-replacement for human review
+ReviuAh is a **pre-review** assistant and CI gate (`--strict`), not a replacement for human review.
 
-ReviuAh is: - A pre-review intelligence assistant - A risk detector - A
-structured feedback generator - A CI gatekeeper
+Lihat juga **[docs/cara-pakai.md](./docs/cara-pakai.md)** (ringkas, Indonesia).

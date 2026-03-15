@@ -1,18 +1,21 @@
+import { writeFile } from "node:fs/promises";
 import { execa } from "execa";
 import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
-import {
-  OpenAIProvider,
-  resolveProviderDefaults,
-} from "../providers/openai.js";
+import { OpenAIProvider } from "../providers/openai.js";
 import type { ReviewResponse } from "../providers/index.js";
+import { resolveReviewCredentials } from "../config/user-config.js";
 
 const MAX_DIFF_SIZE = 120000;
 
 export interface ReviewCommandOptions {
   commit?: string;
   range?: string;
+  /** Base ref vs current HEAD (e.g. main → diff main...HEAD). */
+  base?: string;
   strict: boolean;
   lang: string;
+  /** Write review markdown to this path instead of only stdout. */
+  out?: string;
 }
 
 export async function reviewCommand(
@@ -47,34 +50,37 @@ export async function reviewCommand(
       "- Stage or select changes before running ReviuAh.",
     ].join("\n");
 
-    console.log(emptyMarkdown);
+    await outputReview(emptyMarkdown, options.out);
     return { markdown: emptyMarkdown, risk: "unknown" };
   }
 
   const trimmedDiff = trimDiff(diff, MAX_DIFF_SIZE);
 
-  const apiKey = process.env.REVIUAH_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing REVIUAH_API_KEY environment variable.");
-  }
-
-  const providerDefaults = resolveProviderDefaults(
-    process.env.REVIUAH_PROVIDER,
-  );
+  const { apiKey, baseURL, model } = await resolveReviewCredentials();
 
   const provider = new OpenAIProvider({
     apiKey,
-    baseURL: process.env.REVIUAH_PROVIDER_URL ?? providerDefaults.baseURL,
-    model: process.env.REVIUAH_MODEL ?? providerDefaults.defaultModel,
+    baseURL,
+    model,
   });
 
   const result = await provider.review({
     diff: trimmedDiff,
     language: options.lang,
   });
-  console.log(result.markdown);
+
+  await outputReview(result.markdown, options.out);
 
   return result;
+}
+
+async function outputReview(markdown: string, outPath?: string): Promise<void> {
+  if (outPath) {
+    await writeFile(outPath, markdown, "utf8");
+    console.error(`ReviuAh: review written to ${outPath}`);
+  } else {
+    console.log(markdown);
+  }
 }
 
 async function ensureGitRepository(): Promise<void> {
@@ -87,8 +93,15 @@ async function ensureGitRepository(): Promise<void> {
 }
 
 async function resolveDiff(options: ReviewCommandOptions): Promise<string> {
-  if (options.commit && options.range) {
-    throw new Error("Use either --commit or --range, not both.");
+  const modes = [
+    Boolean(options.commit),
+    Boolean(options.range),
+    Boolean(options.base),
+  ].filter(Boolean).length;
+  if (modes > 1) {
+    throw new Error(
+      "Use only one of: default (staged), --commit, --range, or --base.",
+    );
   }
 
   if (options.commit) {
@@ -97,6 +110,10 @@ async function resolveDiff(options: ReviewCommandOptions): Promise<string> {
 
   if (options.range) {
     return getRangeDiff(options.range);
+  }
+
+  if (options.base) {
+    return getRangeDiff(`${options.base}...HEAD`);
   }
 
   return getStagedDiff();
