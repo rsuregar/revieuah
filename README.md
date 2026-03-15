@@ -93,6 +93,8 @@ The CLI prints structured Markdown:
 | `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000). |
 | `REVIUAH_CUSTOM_PROMPT` | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
 
+**Prompt file:** If neither `--prompt` nor `REVIUAH_CUSTOM_PROMPT` is set, ReviuAh looks for `reviuah-prompt.md` in the **git repo root** and uses its contents as the custom prompt. Use this to share review instructions with your team (commit the file).
+
 Env overrides saved config (useful for CI).
 
 ---

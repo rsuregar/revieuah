@@ -42,7 +42,7 @@ Example ranges: `origin/main...HEAD`, `develop...feature/foo`.
 | `--out <file>` | — | Write review to file (markdown or JSON) |
 | `--strict` | `false` | Exit with code 1 when risk level is **high** (for CI gate) |
 | `--per-file` | `false` | Output JSON with per-line comments (for CI inline comments) |
-| `--prompt <text>` | — | Custom instructions for the reviewer (e.g. focus on security, style guide) |
+| `--prompt <text>` | — | Custom instructions for the reviewer (e.g. focus on security, style guide). Or use a file in repo root (see below). |
 
 ### Example combinations
 
@@ -62,6 +62,8 @@ reviuah --range origin/main...HEAD --per-file --out review.json --lang en
 # Fail CI when risk is high
 reviuah --base origin/main --strict --out review.md
 ```
+
+**Custom prompt from file:** Place a file named `reviuah-prompt.md` in your **git repository root**. If you don’t pass `--prompt` and don’t set `REVIUAH_CUSTOM_PROMPT`, ReviuAh will use that file’s contents as the custom prompt. Use Markdown for structure (headings, lists). Commit the file to share review rules with your team.
 
 ---
 
@@ -141,7 +143,7 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_MODEL` | No | from preset | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent (smaller = cheaper) |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | No | 60000 | Request timeout to API (ms) |
-| `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`) |
+| `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. |
 
 ### Example usage with env
 
@@ -161,11 +163,15 @@ REVIUAH_MAX_DIFF_SIZE=50000 reviuah --base main
 
 ## Configuration priority
 
-1. **Environment variables** (highest)
-2. **Config file** `~/.reviuah/config.json` (from `reviuah setup`)
-3. **Defaults** from the provider preset
+**API / provider:**  
+1. Environment variables (highest)  
+2. Config file `~/.reviuah/config.json` (from `reviuah setup`)  
+3. Defaults from the provider preset  
 
-So: `REVIUAH_API_KEY` and `REVIUAH_PROVIDER` in env override the config file.
+**Custom prompt:**  
+1. CLI `--prompt "..."`  
+2. Env `REVIUAH_CUSTOM_PROMPT`  
+3. File `reviuah-prompt.md` in git repo root (if present)
 
 ---
 
