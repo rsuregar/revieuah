@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -25,11 +26,45 @@ jobs:
       - name: Install ReviuAh
         run: npm install -g reviuah
 
-      - name: Run ReviuAh (code review from diff)
-        run: reviuah --range origin/${{ github.base_ref }}...HEAD --strict
+      - name: Run ReviuAh
+        run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
-          # Native Gemini (untuk hemat token bisa pakai model lebih kecil atau turunkan max diff)
           REVIUAH_PROVIDER_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent
-          # Batas karakter diff yang dikirim (default 120000). Lebih kecil = lebih hemat token.
           REVIUAH_MAX_DIFF_SIZE: 60000
+
+      - name: Comment review on PR
+        if: success() && hashFiles('review.md') != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('review.md', 'utf8').trim();
+            if (!body) return;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const marker = '<!-- reviuah-review -->';
+            const existing = comments.find(c => c.body?.includes(marker));
+            const content = `${marker}\n# 🔍 ReviuAh — AI Code Review\n\n${body}`;
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: content,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: content,
+              });
+            }
