@@ -23,12 +23,23 @@ async function question(defaultLabel: string, def?: string): Promise<string> {
   }
 }
 
-export async function setupCommand(): Promise<void> {
+export interface SetupOptions {
+  /** Force simple prompts even when TTY is available (e.g. automation). */
+  noWizard?: boolean;
+  /** Force full-screen TUI wizard even when TTY detection would skip it (e.g. in some IDEs). */
+  wizard?: boolean;
+}
+
+export async function setupCommand(options?: SetupOptions): Promise<void> {
   const existing = await readUserConfig();
   const path = getUserConfigPath();
 
-  // Prefer full-screen wizard when stdin is TTY (interactive); stdout must be TTY for blessed to draw.
-  const useWizard = input.isTTY && output.isTTY;
+  const forceWizard = options?.wizard === true;
+  const forceNoWizard = options?.noWizard === true;
+  // Default: coba wizard bila stdin interaktif (TUI intuitif). Tanpa --no-wizard, selalu coba wizard dulu.
+  const useWizard =
+    forceWizard || (!forceNoWizard && input.isTTY);
+
   if (useWizard) {
     try {
       const saved = await new SetupWizard(existing).run();
@@ -37,10 +48,8 @@ export async function setupCommand(): Promise<void> {
       }
       return;
     } catch (err) {
-      console.error("Wizard error, falling back to simple prompts:", err);
+      console.error("Wizard tidak tersedia, pakai prompt sederhana:", err instanceof Error ? err.message : err);
     }
-  } else if (input.isTTY) {
-    console.error("Tip: jalankan reviuah setup di terminal langsung (bukan via pipe) untuk form penuh.\n");
   }
 
   console.error("ReviuAh setup — menyimpan konfigurasi di:");

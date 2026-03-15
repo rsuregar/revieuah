@@ -38,27 +38,31 @@ program
   .description(
     "Interactive: simpan API key & provider ke ~/.reviuah/config.json (dipakai jika env tidak diset)",
   )
-  .action(async () => {
-    await setupCommand();
+  .option("--wizard", "paksa form penuh (TUI) meski terminal tidak terdeteksi TTY")
+  .option("--no-wizard", "pakai prompt sederhana saja (tanpa TUI)")
+  .action(async (opts: { wizard?: boolean }) => {
+    await setupCommand({
+      noWizard: opts.wizard === false,
+      wizard: opts.wizard === true,
+    });
   });
 
 program
   .command("config")
   .description("Tampilkan lokasi file config dan status API key")
-  .action(async () => {
-    await configStatusCommand();
+  .option("--update", "buka setup untuk mengubah config (sama dengan reviuah setup)")
+  .action(async (opts: { update?: boolean }) => {
+    if (opts.update) {
+      await setupCommand();
+    } else {
+      await configStatusCommand();
+    }
   });
 
+// All commands (setup, config, version, update) are visible in --help by default.
 program
-  .command("update")
-  .description("Update dependensi lalu build ulang (untuk development / setelah pull)")
-  .action(async () => {
-    await updateCommand();
-  });
-
-program
-  .command("version <type>", { hidden: false })
-  .description("Bump version: patch (bugfix), minor (fitur baru), major (breaking)")
+  .command("version <type>")
+  .description("Bump package version: patch | minor | major (untuk release)")
   .action(async (type: string) => {
     const t = type?.toLowerCase();
     if (t !== "patch" && t !== "minor" && t !== "major") {
@@ -67,6 +71,13 @@ program
       return;
     }
     await versionBumpCommand(t as "patch" | "minor" | "major");
+  });
+
+program
+  .command("update")
+  .description("Update dependensi lalu build ulang (development / setelah pull)")
+  .action(async () => {
+    await updateCommand();
   });
 
 program
