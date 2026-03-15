@@ -42,6 +42,7 @@ Example ranges: `origin/main...HEAD`, `develop...feature/foo`.
 | `--out <file>` | — | Write review to file (markdown or JSON) |
 | `--strict` | `false` | Exit with code 1 when risk level is **high** (for CI gate) |
 | `--per-file` | `false` | Output JSON with per-line comments (for CI inline comments) |
+| `--summary` / `--no-summary` | `true` | Enable/disable summary markdown generation |
 | `--prompt <text>` | — | Custom instructions for the reviewer (e.g. focus on security, style guide). Or use a file in repo root (see below). |
 
 ### Example combinations
@@ -58,6 +59,9 @@ reviuah --range origin/main...HEAD --prompt "Focus on security and error handlin
 
 # Per-file JSON (for CI)
 reviuah --range origin/main...HEAD --per-file --out review.json --lang en
+
+# Disable summary markdown generation
+reviuah --range origin/main...HEAD --no-summary --out review.md
 
 # Fail CI when risk is high
 reviuah --base origin/main --strict --out review.md
@@ -143,6 +147,7 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_MODEL` | No | from preset | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent (smaller = cheaper) |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | No | 60000 | Request timeout to API (ms) |
+| `REVIUAH_ENABLE_SUMMARY` | No | enabled | Set `0` / `false` to disable summary markdown generation (same as `--no-summary`) |
 | `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. |
 
 ### Example usage with env
@@ -157,6 +162,9 @@ reviuah --range origin/main...HEAD --out review.md
 
 # Limit diff size (save tokens)
 REVIUAH_MAX_DIFF_SIZE=50000 reviuah --base main
+
+# Disable summary generation from env
+REVIUAH_ENABLE_SUMMARY=0 reviuah --base main --out review.md
 ```
 
 ---
