@@ -3,24 +3,33 @@ name: Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  pull_request_review_comment:
-    types: [created]
 
 jobs:
   review:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Run Code Review
-        uses: rsurega/reviuah@v1
         with:
-          reviewer-api-key: ${{ secrets.REVIEWER_API_KEY }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          openai-url: https://generativelanguage.googleapis.com/v1beta/openai/
-          max-diff-size: 500000
-          model-name: gemini-1.5-flash
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install ReviuAh
+        run: npm install -g reviuah
+
+      - name: Run ReviuAh (code review from diff)
+        run: reviuah --range origin/${{ github.base_ref }}...HEAD --strict
+        env:
+          REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
+          # Native Gemini (untuk hemat token bisa pakai model lebih kecil atau turunkan max diff)
+          REVIUAH_PROVIDER_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent
+          # Batas karakter diff yang dikirim (default 120000). Lebih kecil = lebih hemat token.
+          REVIUAH_MAX_DIFF_SIZE: 60000

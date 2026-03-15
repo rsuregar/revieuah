@@ -7,6 +7,12 @@ import { dirname, join } from "node:path";
 import { reviewCommand } from "./commands/review.js";
 import { setupCommand } from "./commands/setup.js";
 import { configStatusCommand } from "./commands/config-status.js";
+import {
+  getUpdateInfo,
+  printUpdateMessage,
+  promptUpdateNow,
+  runUpdate,
+} from "./lib/check-update.js";
 
 function readPkgVersion(): string {
   try {
@@ -76,6 +82,14 @@ program
 
       if (options.strict && result.risk === "high") {
         process.exitCode = 1;
+      }
+
+      const currentVersion = readPkgVersion();
+      const updateInfo = await getUpdateInfo(currentVersion);
+      if (updateInfo) {
+        printUpdateMessage(updateInfo);
+        const doUpdate = await promptUpdateNow();
+        if (doUpdate) await runUpdate();
       }
     },
   );
