@@ -33,10 +33,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Node 22 LTS: stable, matches package.json engines; avoids Node 20 deprecation on Actions
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Enable Corepack
@@ -55,6 +56,7 @@ jobs:
 
       - name: Bump version and publish
         run: |
+          npm pkg fix
           npm version ${{ env.VERSION_BUMP }} -m "chore: release %s [skip ci]"
           npm publish --access public
         env:
