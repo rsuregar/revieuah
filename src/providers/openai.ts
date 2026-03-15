@@ -8,14 +8,31 @@ import type {
 } from "./index.js";
 import { buildPerFilePrompt, parsePerFileResponse } from "./per-file-prompt.js";
 
+const RATE_LIMIT_HINT =
+  " Try again later. You can use a different provider (REVIUAH_PROVIDER) or model, or reduce the diff size.";
+
 function messageForStatus(status: number): string {
   switch (status) {
     case 401: return "Authentication failed (401). Check your API key.";
     case 403: return "Forbidden (403). API key does not have access.";
     case 404: return "Not found (404). Check model name or endpoint URL.";
-    case 429: return "Rate limit exceeded (429). Try again later.";
+    case 429:
+      return "Rate limit exceeded (429)." + RATE_LIMIT_HINT;
     default: return `Request failed (${status}).`;
   }
+}
+
+function isRateLimitError(err: unknown): boolean {
+  const status = (err as { status?: number })?.status;
+  if (status === 429) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /rate\s*limit|limit\s*exceeded/i.test(msg);
+}
+
+function messageForRateLimit(err: unknown): string {
+  const status = (err as { status?: number })?.status;
+  const base = typeof status === "number" ? `Rate limit exceeded (${status}).` : "Rate limit exceeded.";
+  return base + RATE_LIMIT_HINT;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
@@ -175,6 +192,9 @@ export class OpenAIProvider implements Provider {
 
       return { markdown, risk };
     } catch (err: unknown) {
+      if (isRateLimitError(err)) {
+        throw new Error(messageForRateLimit(err));
+      }
       const status = (err as { status?: number })?.status;
       if (typeof status === "number") {
         throw new Error(messageForStatus(status));
@@ -208,6 +228,9 @@ export class OpenAIProvider implements Provider {
       const raw = response.choices[0]?.message?.content?.trim() ?? "{}";
       return parsePerFileResponse(raw);
     } catch (err: unknown) {
+      if (isRateLimitError(err)) {
+        throw new Error(messageForRateLimit(err));
+      }
       const status = (err as { status?: number })?.status;
       if (typeof status === "number") {
         throw new Error(messageForStatus(status));

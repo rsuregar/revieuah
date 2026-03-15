@@ -76,8 +76,10 @@ program
 program
   .command("update")
   .description("Update dependensi lalu build ulang (development / setelah pull)")
-  .action(async () => {
-    await updateCommand();
+  .option("--no-build", "upgrade dependencies only, skip build")
+  .option("--install-only", "install from lockfile only (no upgrade); use to avoid unexpected dependency bumps")
+  .action(async (opts: { noBuild?: boolean; installOnly?: boolean }) => {
+    await updateCommand({ noBuild: opts.noBuild, installOnly: opts.installOnly });
   });
 
 program
