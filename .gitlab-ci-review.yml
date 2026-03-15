@@ -27,15 +27,18 @@ code-review:
   script:
     - npm install -g reviuah@latest
 
-    # Overall summary
+    # Overall summary (|| true = do not fail job if API/rate-limit error; comment will be skipped)
     - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --out review.md --lang en || true
 
     # Per-file inline comments
     - reviuah --range "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" --per-file --out review.json --lang en || true
 
-    # Post/update summary note on MR
+    # Post/update summary note on MR (skip if review.md missing or empty)
     - |
-      [ -s review.md ] || exit 0
+      if [ ! -s review.md ]; then
+        echo "ReviuAh did not produce review.md (check logs above for errors). Comment skipped."
+        exit 0
+      fi
       API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
       TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
       MARKER="<!-- reviuah-review -->"

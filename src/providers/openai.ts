@@ -198,7 +198,7 @@ export class OpenAIProvider implements Provider {
         ],
       });
 
-      const markdown = response.choices[0]?.message?.content?.trim() ?? "";
+      const markdown = response.choices?.[0]?.message?.content?.trim() ?? "";
       const risk = extractRiskLevel(markdown);
 
       return { markdown, risk };
@@ -238,7 +238,7 @@ export class OpenAIProvider implements Provider {
         ],
       });
 
-      const raw = response.choices[0]?.message?.content?.trim() ?? "{}";
+      const raw = response.choices?.[0]?.message?.content?.trim() ?? "{}";
       return parsePerFileResponse(raw);
     } catch (err: unknown) {
       if (isRateLimitError(err)) {
