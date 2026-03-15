@@ -1,4 +1,9 @@
-import type { FileComment, PerFileReviewResponse, ReviewRequest, RiskLevel } from "./index.js";
+import type {
+  FileComment,
+  PerFileReviewResponse,
+  ReviewRequest,
+  RiskLevel,
+} from "./index.js";
 
 const PER_FILE_SYSTEM = `You are ReviuAh, a code reviewer. Respond with ONLY a valid JSON object (no markdown, no fences).
 
@@ -7,15 +12,22 @@ Schema:
 
 Severity: critical = bugs/security/breaking, fix now. warning = issues/bad practices. suggestion/praise = omit unless noteworthy.
 Rules: path = from diff header (e.g. b/src/foo.ts → src/foo.ts). line = NEW file line (0 = file-level). Only comment on added/modified lines. Prefer critical/warning only; empty comments[] if low risk and no issues. Keep body 1-3 sentences.
-When your comment would benefit from showing optimal or fixed code, add "suggestionCode" with a short snippet (same line or few lines). Omit if the issue is conceptual only. Keep suggestionCode minimal and directly applicable.`;
+Add "suggestionCode" only when the fix is clear, local, and short enough to paste directly. Prefer it for high-signal issues such as security bugs, unsafe API usage, incorrect framework patterns, or obvious logic fixes. Omit it for conceptual, architectural, speculative, or large refactors. Keep suggestionCode minimal and directly applicable, usually 1-6 lines. Do not include explanations, fences, placeholders, ellipses, or alternative implementations inside suggestionCode.`;
 
-export function buildPerFilePrompt(request: ReviewRequest): { system: string; user: string } {
+export function buildPerFilePrompt(request: ReviewRequest): {
+  system: string;
+  user: string;
+} {
   const parts = [
     `Output language: ${request.language}.`,
     "Review the following git diff and return per-file inline comments as JSON.",
   ];
   if (request.customPrompt?.trim()) {
-    parts.push("", "Additional instructions from the user:", request.customPrompt.trim());
+    parts.push(
+      "",
+      "Additional instructions from the user:",
+      request.customPrompt.trim(),
+    );
   }
   parts.push("", "Git diff:", "", request.diff);
   const user = parts.join("\n");
@@ -51,7 +63,12 @@ export function parsePerFileResponse(raw: string): PerFileReviewResponse {
     };
   }
 
-  const validSeverities = new Set(["critical", "warning", "suggestion", "praise"]);
+  const validSeverities = new Set([
+    "critical",
+    "warning",
+    "suggestion",
+    "praise",
+  ]);
   const validRisks = new Set(["low", "medium", "high", "unknown"]);
 
   const risk = validRisks.has(parsed.risk?.toLowerCase() ?? "")
@@ -69,9 +86,10 @@ export function parsePerFileResponse(raw: string): PerFileReviewResponse {
       severity: validSeverities.has(c.severity?.toLowerCase() ?? "")
         ? (c.severity!.toLowerCase() as FileComment["severity"])
         : "warning",
-      ...(typeof c.suggestionCode === "string" && c.suggestionCode.trim() && {
-        suggestionCode: c.suggestionCode.trim(),
-      }),
+      ...(typeof c.suggestionCode === "string" &&
+        c.suggestionCode.trim() && {
+          suggestionCode: c.suggestionCode.trim(),
+        }),
     }))
     .filter((c) => actionableSeverities.has(c.severity));
 
