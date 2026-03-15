@@ -38,7 +38,10 @@ program
   .description(
     "Interactive: simpan API key & provider ke ~/.reviuah/config.json (dipakai jika env tidak diset)",
   )
-  .option("--wizard", "paksa form penuh (TUI) meski terminal tidak terdeteksi TTY")
+  .option(
+    "--wizard",
+    "paksa form penuh (TUI) meski terminal tidak terdeteksi TTY",
+  )
   .option("--no-wizard", "pakai prompt sederhana saja (tanpa TUI)")
   .action(async (opts: { wizard?: boolean }) => {
     await setupCommand({
@@ -50,7 +53,10 @@ program
 program
   .command("config")
   .description("Tampilkan lokasi file config dan status API key")
-  .option("--update", "buka setup untuk mengubah config (sama dengan reviuah setup)")
+  .option(
+    "--update",
+    "buka setup untuk mengubah config (sama dengan reviuah setup)",
+  )
   .action(async (opts: { update?: boolean }) => {
     if (opts.update) {
       await setupCommand();
@@ -75,16 +81,27 @@ program
 
 program
   .command("update")
-  .description("Update dependensi lalu build ulang (development / setelah pull)")
+  .description(
+    "Update dependensi lalu build ulang (development / setelah pull)",
+  )
   .option("--no-build", "upgrade dependencies only, skip build")
-  .option("--install-only", "install from lockfile only (no upgrade); use to avoid unexpected dependency bumps")
+  .option(
+    "--install-only",
+    "install from lockfile only (no upgrade); use to avoid unexpected dependency bumps",
+  )
   .action(async (opts: { noBuild?: boolean; installOnly?: boolean }) => {
-    await updateCommand({ noBuild: opts.noBuild, installOnly: opts.installOnly });
+    await updateCommand({
+      noBuild: opts.noBuild,
+      installOnly: opts.installOnly,
+    });
   });
 
 program
   .option("--commit <ref>", "review a specific commit")
-  .option("--range <range>", "review a git range, e.g. main...HEAD or origin/main...HEAD")
+  .option(
+    "--range <range>",
+    "review a git range, e.g. main...HEAD or origin/main...HEAD",
+  )
   .option(
     "--base <ref>",
     "review current branch vs base (same as --range <ref>...HEAD), e.g. main or origin/main",
@@ -92,11 +109,22 @@ program
   .option("--strict", "exit with code 1 when risk level is high", false)
   .option("--lang <lang>", "output language", "en")
   .option("--out <file>", "write review markdown to file")
-  .option("--per-file", "output per-file inline comments as JSON (for CI integration)", false)
+  .option(
+    "--per-file",
+    "output per-file inline comments as JSON (for CI integration)",
+    false,
+  )
   .option("--summary", "enable summary markdown review output (default)", true)
   .option("--no-summary", "disable summary markdown review output")
-  .option("--compact", "minimal review output (fewer sections, lower token usage)", false)
-  .option("--prompt <text>", "custom instructions for the reviewer (e.g. focus on security, follow our style guide)")
+  .option(
+    "--compact",
+    "minimal review output (fewer sections, lower token usage)",
+    false,
+  )
+  .option(
+    "--prompt <text>",
+    "custom instructions for the reviewer (e.g. focus on security, follow our style guide)",
+  )
   .action(
     async (options: {
       commit?: string;

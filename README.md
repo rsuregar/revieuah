@@ -92,11 +92,11 @@ The CLI prints structured Markdown:
 | `REVIUAH_MAX_DIFF_SIZE`      | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper.                          |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000).                                                     |
 | `REVIUAH_ENABLE_SUMMARY`     | Set to `0` / `false` to disable summary markdown generation (same effect as `--no-summary`). Default enabled.     |
-| `REVIUAH_COMPACT`            | Set to `1` or `true` for minimal review output (fewer sections, lower token usage). Same as `--compact`.          |
+| `REVIUAH_COMPACT`            | Set to `1` or `true` for minimal review output. Same as `--compact`. It also uses a smaller git diff context to reduce input tokens. |
 | `REVIUAH_MAX_OUTPUT_TOKENS`  | Cap completion length (e.g. `2000`). Reduces output tokens; may truncate long reviews.                            |
 | `REVIUAH_CUSTOM_PROMPT`      | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
 
-**Reducing token usage:** Use `--compact` or `REVIUAH_COMPACT=1` for shorter reviews. Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length.
+**Reducing token usage:** Use `--compact` or `REVIUAH_COMPACT=1` for shorter reviews and smaller diff context. Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. ReviuAh also filters token-heavy files such as lockfiles, build outputs, minified assets, and common binaries before sending the diff, and when truncation is still needed it trims at file boundaries instead of hard-cutting raw text. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length.
 
 **Prompt file:** If neither `--prompt` nor `REVIUAH_CUSTOM_PROMPT` is set, ReviuAh looks for `reviuah-prompt.md` in the **git repo root** and uses its contents as the custom prompt. Use this to share review instructions with your team (commit the file).
 

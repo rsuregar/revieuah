@@ -145,9 +145,11 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_PROVIDER` | No | `agentrouter` | Preset: `openai`, `gemini`, `anthropic`, `deepseek`, `groq`, `mistral`, `together`, `fireworks`, `openrouter`, `cerebras`, `glm`, `ollama`, `agentrouter` |
 | `REVIUAH_PROVIDER_URL` | No | from preset | Override API base URL |
 | `REVIUAH_MODEL` | No | from preset | Override model name |
-| `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent (smaller = cheaper) |
+| `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent after ReviuAh filters token-heavy files and truncates at file boundaries (smaller = cheaper) |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | No | 60000 | Request timeout to API (ms) |
 | `REVIUAH_ENABLE_SUMMARY` | No | enabled | Set `0` / `false` to disable summary markdown generation (same as `--no-summary`) |
+| `REVIUAH_COMPACT` | No | disabled | Set `1` / `true` for shorter review output and smaller git diff context to reduce token usage |
+| `REVIUAH_MAX_OUTPUT_TOKENS` | No | provider default | Cap completion length (for example `1500`) to reduce output tokens |
 | `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. |
 
 ### Example usage with env
@@ -163,11 +165,32 @@ reviuah --range origin/main...HEAD --out review.md
 # Limit diff size (save tokens)
 REVIUAH_MAX_DIFF_SIZE=50000 reviuah --base main
 
+# Minimal review + smaller diff context
+REVIUAH_COMPACT=1 reviuah --base main
+
+# Cap output tokens
+REVIUAH_MAX_OUTPUT_TOKENS=1500 reviuah --base main
+
 # Disable summary generation from env
 REVIUAH_ENABLE_SUMMARY=0 reviuah --base main --out review.md
 ```
 
+### Token optimization notes
+
+ReviuAh now reduces prompt size more intelligently before sending a review request:
+
+- Filters token-heavy files such as lockfiles, build artifacts, minified assets, and common binary files from the diff.
+- Truncates large diffs at file boundaries instead of hard-cutting raw text mid-file.
+- In compact mode (`--compact` or `REVIUAH_COMPACT=1`), uses shorter review output and smaller git diff context to further reduce tokens.
+
+For the lowest token usage in CI, combine these settings:
+
+```bash
+REVIUAH_COMPACT=1 REVIUAH_MAX_DIFF_SIZE=50000 REVIUAH_MAX_OUTPUT_TOKENS=1500 reviuah --base main
+```
+
 ---
+
 
 ## AgentRouter: testing with curl
 

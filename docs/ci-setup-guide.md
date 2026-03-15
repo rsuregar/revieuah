@@ -305,6 +305,11 @@ For large repos, limit the diff sent to the LLM:
 REVIUAH_MAX_DIFF_SIZE: 60000   # characters (default 120000)
 ```
 
+ReviuAh also reduces token usage before sending the diff:
+- filters token-heavy files such as lockfiles, build artifacts, minified assets, and common binary files
+- preserves whole file sections when truncating, instead of hard-cutting raw diff text
+- uses smaller diff context in compact mode to reduce prompt size further
+
 ### Enable/Disable Summary
 
 Use `REVIUAH_ENABLE_SUMMARY` to control summary generation in CI workflows:
