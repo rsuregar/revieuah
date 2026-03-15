@@ -93,6 +93,7 @@ program
   .option("--lang <lang>", "output language", "en")
   .option("--out <file>", "write review markdown to file")
   .option("--per-file", "output per-file inline comments as JSON (for CI integration)", false)
+  .option("--compact", "minimal review output (fewer sections, lower token usage)", false)
   .option("--prompt <text>", "custom instructions for the reviewer (e.g. focus on security, follow our style guide)")
   .action(
     async (options: {
@@ -103,6 +104,7 @@ program
       lang?: string;
       out?: string;
       perFile?: boolean;
+      compact?: boolean;
       prompt?: string;
     }) => {
       const result = await reviewCommand({
@@ -113,6 +115,7 @@ program
         lang: options.lang ?? "en",
         out: options.out,
         perFile: Boolean(options.perFile),
+        compact: Boolean(options.compact),
         customPrompt: options.prompt,
       });
 

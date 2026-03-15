@@ -161,6 +161,29 @@ REVIUAH_MAX_DIFF_SIZE=50000 reviuah --base main
 
 ---
 
+## AgentRouter: testing with curl
+
+Default provider **AgentRouter** is OpenAI-compatible. Base URL: `https://agentrouter.org/v1`. You can hit the same endpoint ReviuAh uses with curl:
+
+```bash
+# Set your API key (same as REVIUAH_API_KEY)
+export API_KEY="your-agentrouter-api-key"
+
+# Chat completions (same shape ReviuAh uses)
+curl -s "https://agentrouter.org/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $API_KEY" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Say hello in one word."}],
+    "max_tokens": 50
+  }'
+```
+
+Response is JSON with `choices[0].message.content`. Use the same `Authorization: Bearer <key>` and body shape when calling from another client.
+
+---
+
 ## Configuration priority
 
 **API / provider:**  

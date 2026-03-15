@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/reviuah.svg)](https://www.npmjs.com/package/reviuah)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-AI-powered CLI to review Git diffs before commit or push. Get structured feedback (summary, risk, security, performance, testing) from an LLM. Use staged changes, a commit, or a branch diff.
+AI-powered CLI to review Git diffs before commit or push. Get structured feedback (summary, risk, security, performance, testing) from an LLM. Use staged changes, a commit, or a branch diff. With `--per-file`, inline comments can include optional **suggested code** (optimal fix or improvement).
 
 ---
 
@@ -91,7 +91,11 @@ The CLI prints structured Markdown:
 | `REVIUAH_MODEL` | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000). |
+| `REVIUAH_COMPACT` | Set to `1` or `true` for minimal review output (fewer sections, lower token usage). Same as `--compact`. |
+| `REVIUAH_MAX_OUTPUT_TOKENS` | Cap completion length (e.g. `2000`). Reduces output tokens; may truncate long reviews. |
 | `REVIUAH_CUSTOM_PROMPT` | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
+
+**Reducing token usage:** Use `--compact` or `REVIUAH_COMPACT=1` for shorter reviews. Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length.
 
 **Prompt file:** If neither `--prompt` nor `REVIUAH_CUSTOM_PROMPT` is set, ReviuAh looks for `reviuah-prompt.md` in the **git repo root** and uses its contents as the custom prompt. Use this to share review instructions with your team (commit the file).
 

@@ -130,15 +130,16 @@ jobs:
             // Map severity to emoji
             const emoji = { critical: '🔴', warning: '🟡', suggestion: '💡', praise: '✅' };
 
-            // Build review comments array
+            // Build review comments array (include optional suggestionCode as code block)
             const prComments = data.comments
               .filter(c => c.path && c.line > 0 && c.body)
-              .map(c => ({
-                path: c.path,
-                line: c.line,
-                side: 'RIGHT',
-                body: `${emoji[c.severity] || '💡'} **${c.severity}**: ${c.body}`,
-              }));
+              .map(c => {
+                let body = `${emoji[c.severity] || '💡'} **${c.severity}**: ${c.body}`;
+                if (c.suggestionCode && c.suggestionCode.trim()) {
+                  body += `\n\n**Suggested fix:**\n\`\`\`\n${c.suggestionCode.trim()}\n\`\`\``;
+                }
+                return { path: c.path, line: c.line, side: 'RIGHT', body };
+              });
 
             if (prComments.length === 0) return;
 

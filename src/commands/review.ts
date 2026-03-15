@@ -32,6 +32,8 @@ export interface ReviewCommandOptions {
   perFile?: boolean;
   /** Custom instructions for the reviewer (focus areas, style, etc.). */
   customPrompt?: string;
+  /** Minimal output (fewer sections, lower token usage). */
+  compact?: boolean;
 }
 
 export async function reviewCommand(
@@ -80,6 +82,9 @@ export async function reviewCommand(
   const provider = createProvider(credentials);
 
   const customPrompt = await resolveCustomPrompt(options.customPrompt);
+  const compact =
+    options.compact === true ||
+    (process.env.REVIUAH_COMPACT?.trim() === "1" || process.env.REVIUAH_COMPACT?.trim()?.toLowerCase() === "true");
 
   printBanner();
   const stopSpinner = startSpinner("Generating review");
@@ -116,6 +121,7 @@ export async function reviewCommand(
       diff: trimmedDiff,
       language: options.lang,
       customPrompt,
+      compact,
     });
   } finally {
     stopSpinner();

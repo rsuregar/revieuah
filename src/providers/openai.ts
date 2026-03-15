@@ -46,6 +46,15 @@ function getRequestTimeoutMs(): number {
   return DEFAULT_REQUEST_TIMEOUT_MS;
 }
 
+/** Optional max completion tokens (env REVIUAH_MAX_OUTPUT_TOKENS). Cap output to reduce token usage. */
+function getMaxOutputTokens(): number | undefined {
+  const env = process.env.REVIUAH_MAX_OUTPUT_TOKENS?.trim();
+  if (!env) return undefined;
+  const n = parseInt(env, 10);
+  if (!Number.isFinite(n) || n < 100) return undefined;
+  return Math.min(n, 16000);
+}
+
 export interface OpenAIProviderOptions {
   apiKey: string;
   baseURL?: string;
@@ -171,14 +180,16 @@ export class OpenAIProvider implements Provider {
     const prompt = this.buildPrompt(request);
 
     try {
+      const maxTokens = getMaxOutputTokens();
       const response = await this.client.chat.completions.create({
         model: this.model,
         temperature: 0.2,
+        ...(maxTokens != null && { max_tokens: maxTokens }),
         messages: [
           {
             role: "system",
             content:
-              "You are ReviuAh, a senior software reviewer. You MUST output valid Markdown and strictly follow the required headings and order.",
+              "You are ReviuAh, a concise code reviewer. Output only valid Markdown. Use the exact section headings given. Prefer bullets; max 2-3 sentences per section.",
           },
           {
             role: "user",
@@ -216,9 +227,11 @@ export class OpenAIProvider implements Provider {
     const { system, user } = buildPerFilePrompt(request);
 
     try {
+      const maxTokens = getMaxOutputTokens();
       const response = await this.client.chat.completions.create({
         model: this.model,
         temperature: 0.2,
+        ...(maxTokens != null && { max_tokens: maxTokens }),
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -240,23 +253,43 @@ export class OpenAIProvider implements Provider {
   }
 
   private buildPrompt(request: ReviewRequest): string {
-    const parts = [
-      "Review the following git diff.",
-      `Output language: ${request.language}.`,
-      "Return Markdown with EXACTLY these sections and order:",
-      "## Summary",
-      "## Risk Level",
-      "Low | Medium | High | Unknown",
-      "Reason:",
-      "## Security Review",
-      "## Performance Review",
-      "## Testing Suggestions",
-      "## Code Quality & Maintainability",
-      "## Actionable Suggestions",
-      "Keep the review concise and practical.",
-    ];
+    const lang = `Output language: ${request.language}.`;
+    const compact = request.compact === true;
+
+    const parts: string[] = ["Review this git diff. " + lang];
+
+    if (compact) {
+      parts.push(
+        "",
+        "Use ONLY these sections (keep each very short):",
+        "## Summary",
+        "One short paragraph.",
+        "## Risk Level",
+        "Low | Medium | High | Unknown",
+        "Reason: (one line)",
+        "## Suggestions",
+        "3–5 bullet points (most important only).",
+        "",
+        "Be brief.",
+      );
+    } else {
+      parts.push(
+        "",
+        "Use ONLY these sections. Max 2–3 sentences or a few bullets per section:",
+        "## Summary",
+        "## Risk Level",
+        "Low | Medium | High | Unknown",
+        "Reason:",
+        "## Security & Performance",
+        "## Testing & Quality",
+        "## Actionable Suggestions",
+        "",
+        "Keep concise; bullets preferred.",
+      );
+    }
+
     if (request.customPrompt?.trim()) {
-      parts.push("", "Additional instructions from the user:", request.customPrompt.trim());
+      parts.push("", "User instructions:", request.customPrompt.trim());
     }
     parts.push("", "Git diff:", "", request.diff);
     return parts.join("\n");
