@@ -166,9 +166,11 @@ jobs:
 
 ### GitLab CI
 
-1. Add CI/CD variables: `REVIUAH_API_KEY` and `GITLAB_TOKEN` (personal/project token with `api` scope).
+1. Add CI/CD variables: `REVIUAH_API_KEY` and `GITLAB_TOKEN` (personal or project token with **api** scope).
 2. Copy `.gitlab-ci-review.yml` to your repo as `.gitlab-ci.yml` (or `include` it). It installs ReviuAh from npm (works in any repo).
 3. Every MR will get a note with the AI review.
+
+**CLI works but CI doesn’t?** Check token permissions: [CI setup guide — GitLab token permissions](docs/ci-setup-guide.md#gitlab-token-permissions-and-why-ci-might-fail-cli-works-ci-doesnt) (e.g. **Protected** variables, **GITLAB_TOKEN** must be set with `api` scope).
 
 ```yaml
 code-review:

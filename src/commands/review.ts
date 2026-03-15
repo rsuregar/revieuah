@@ -174,7 +174,14 @@ async function validateOutPath(outPath: string): Promise<void> {
 }
 
 async function outputReview(markdown: string, outPath?: string): Promise<void> {
+  const hasContent = markdown.trim().length > 0;
   if (outPath) {
+    if (!hasContent) {
+      console.error(
+        "ReviuAh: API returned empty review; no file written. Comment will be skipped in CI. Check provider/model or try again.",
+      );
+      return;
+    }
     const absolute = resolve(process.cwd(), outPath);
     const parent = dirname(absolute);
     try {

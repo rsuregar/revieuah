@@ -139,6 +139,47 @@ Create a new branch, change any file, and open a Pull Request. Within a few minu
 > **GITLAB_TOKEN** is required to post comments on MRs. Create it under **User Settings → Access Tokens** (personal) or **Project → Settings → Access Tokens** (project).  
 > Required scope: `api`.
 
+#### GitLab: Token permissions and why CI might fail (CLI works, CI doesn’t)
+
+ReviuAh uses **two different tokens** in CI. If it works locally but not in CI, check the following.
+
+**1. REVIUAH_API_KEY (LLM API)**
+
+| Check | What to do |
+|-------|------------|
+| **Variable exists** | Settings → CI/CD → Variables. Key must be exactly `REVIUAH_API_KEY`. |
+| **Protected** | If the variable is **Protected**, it is only available on **protected branches**. Merge request pipelines often run in the context of the **source branch** (e.g. your feature branch). If that branch is **not** protected, the variable is **not** exposed and ReviuAh will not see the key. **Fix:** Either uncheck **Protected** for `REVIUAH_API_KEY`, or ensure the branch you use for MRs is protected. |
+| **Masked** | If your API key contains characters GitLab cannot mask (e.g. some symbols), the variable may not work when masked. **Fix:** Try creating the variable with **Masked** unchecked to test. Re-mask after confirming it works. |
+| **Value** | Copy the key again from your provider (Gemini, OpenAI, etc.). No extra spaces; use “Reveal” in GitLab to confirm. |
+| **Logs** | In the job log, look for ReviuAh errors: `401` = bad key; `429` = rate limit; `Cannot read properties of undefined` = API returned an error body (check key and provider). |
+
+**2. GITLAB_TOKEN (post comments on the MR)**
+
+| Check | What to do |
+|-------|------------|
+| **Variable set** | The job uses `GITLAB_TOKEN` if set, otherwise `CI_JOB_TOKEN`. **CI_JOB_TOKEN** in merge request pipelines often **cannot** create or update MR notes (comments). You must set **GITLAB_TOKEN** explicitly. |
+| **Token type** | Use a **Personal Access Token** (User → Settings → Access Tokens) or **Project Access Token** (Project → Settings → Access Tokens). Required scope: **`api`** (full API access). |
+| **Protected** | Same as above: if the variable is Protected and your MR branch is not protected, the token is not available and the script will fall back to `CI_JOB_TOKEN`, which may get 401/403 when posting the comment. **Fix:** Uncheck **Protected** for `GITLAB_TOKEN` or use a protected branch. |
+| **403 when posting** | GitLab returns 403 if the token lacks permission. Ensure the token has **api** scope and is not expired. Create a new token if in doubt. |
+
+**3. Quick check in the job**
+
+Add this once at the start of your `script` to confirm variables are present (values are not printed):
+
+```yaml
+- |
+  echo "REVIUAH_API_KEY is set: $([ -n \"$REVIUAH_API_KEY\" ] && echo yes || echo no)"
+  echo "GITLAB_TOKEN is set: $([ -n \"$GITLAB_TOKEN\" ] && echo yes || echo no)"
+```
+
+If either prints `no`, fix the variable (name, Protected, or scope) as above.
+
+**4. Summary**
+
+- **ReviuAh runs but no comment on MR** → Usually **GITLAB_TOKEN** missing or wrong scope or Protected + unprotected branch.  
+- **ReviuAh fails in CI (401 / rate limit / error)** → Usually **REVIUAH_API_KEY** missing (e.g. Protected), wrong value, or provider issue.  
+- **Both tokens** → If using **Protected**, ensure your MR source branch is protected, or uncheck Protected for these variables.
+
 ### Step 2 — Create or Update `.gitlab-ci.yml`
 
 The workflow installs ReviuAh from npm (`npm install -g reviuah@latest`) and runs `reviuah` — **no build from source**, so it works in any repo. For the full template (summary + per-file + MR notes), copy [`.gitlab-ci-review.yml`](https://github.com/rsuregar/reviewah/blob/main/.gitlab-ci-review.yml) from the ReviuAh repo as `.gitlab-ci.yml`.
@@ -283,12 +324,15 @@ On GitHub, the PR check will fail (❌). On GitLab, the pipeline will fail.
 
 | Issue | Solution |
 |-------|----------|
-| Comment does not appear | Check that secret `REVIUAH_API_KEY` is set. Check workflow/pipeline logs. |
-| 401 from LLM | API key is wrong or expired. Generate a new one. |
+| **GitLab: CLI works, CI doesn’t** | See [GitLab: Token permissions and why CI might fail](#gitlab-token-permissions-and-why-ci-might-fail-cli-works-ci-doesnt) above. Most often: **Protected** variables not available on MR branch, or **GITLAB_TOKEN** not set (CI_JOB_TOKEN cannot post notes). |
+| Comment does not appear (GitLab) | Set **GITLAB_TOKEN** (Personal/Project token with `api` scope). Uncheck **Protected** if the MR branch is not protected. Check job log for "GITLAB_TOKEN is set: no". |
+| Comment does not appear (GitHub) | Check that secret **REVIUAH_API_KEY** is set. Check workflow/pipeline logs. |
+| 401 from LLM | API key wrong or expired. In GitLab, if **REVIUAH_API_KEY** is Protected and the MR branch is not protected, the variable is not exposed — uncheck Protected or use a protected branch. |
 | 403 when posting comment (GitHub) | Ensure `permissions: pull-requests: write` is in the workflow. |
-| 403 when posting comment (GitLab) | `GITLAB_TOKEN` needs `api` scope. Or create a new project token. |
+| 403 when posting comment (GitLab) | **GITLAB_TOKEN** must be a Personal or Project token with **api** scope. CI_JOB_TOKEN is not enough. Create a new token if needed. |
 | Diff too large | Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. 40000). |
 | Empty review | Ensure `fetch-depth: 0` (GitHub) or `GIT_DEPTH: 0` (GitLab). |
+| review.md is 0 bytes / empty | The LLM returned no content. ReviuAh will not write the file and will print a warning. Check provider, model, and rate limits; try again. In CI, the comment step will be skipped. |
 
 ---
 
