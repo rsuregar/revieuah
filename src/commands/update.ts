@@ -3,11 +3,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPackageRoot } from "../lib/package-root.js";
 
+/**
+ * Finds the ReviuAh project root. Priority: (1) cwd if it has package.json with name "reviuah",
+ * (2) directory containing the running script (e.g. installed package). Returns null if neither is a reviuah project.
+ * When both are valid (e.g. running from repo root), cwd wins so behavior is deterministic for development.
+ */
 function findReviuahRoot(): string | null {
-  const fromScript = getPackageRoot();
-  const fromScriptPkg = join(fromScript, "package.json");
-  if (existsSync(fromScriptPkg)) return fromScript;
-
   const cwd = process.cwd();
   const cwdPkg = join(cwd, "package.json");
   if (existsSync(cwdPkg)) {
@@ -18,10 +19,21 @@ function findReviuahRoot(): string | null {
       /* ignore */
     }
   }
+
+  const fromScript = getPackageRoot();
+  const fromScriptPkg = join(fromScript, "package.json");
+  if (existsSync(fromScriptPkg)) return fromScript;
+
   return null;
 }
 
-export async function updateCommand(): Promise<void> {
+export interface UpdateCommandOptions {
+  noBuild?: boolean;
+  /** If true, run install only (lockfile); no upgrade. Use to avoid unexpected dependency version bumps. */
+  installOnly?: boolean;
+}
+
+export async function updateCommand(opts: UpdateCommandOptions = {}): Promise<void> {
   const root = findReviuahRoot();
   if (!root) {
     console.error("package.json not found. Run this command from the ReviuAh project root.");
@@ -46,22 +58,36 @@ export async function updateCommand(): Promise<void> {
 
   const useYarn = existsSync(join(root, "yarn.lock"));
   const run = (cmd: string) => execSync(cmd, { cwd: root, stdio: "inherit" });
+  const installOnly = opts.installOnly === true;
 
-  console.error("Installing dependencies...");
+  if (installOnly) {
+    console.error("Installing dependencies from lockfile...");
+  } else {
+    console.error("Updating dependencies (upgrade within semver)...");
+  }
   try {
-    run(useYarn ? "yarn install" : "npm install");
+    run(installOnly ? (useYarn ? "yarn install" : "npm install") : (useYarn ? "yarn upgrade" : "npm update"));
   } catch {
-    console.error("Install failed.");
+    console.error(installOnly ? "Install failed." : "Update failed.");
     return;
   }
 
-  console.error("Building...");
-  try {
-    run(useYarn ? "yarn build" : "npm run build");
-  } catch {
-    console.error("Build failed.");
-    return;
+  const shouldBuild = !opts.noBuild && existsSync(join(root, "tsconfig.json"));
+  const doneVerb = installOnly ? "installed" : "upgraded";
+  if (shouldBuild) {
+    console.error("Building...");
+    try {
+      run(useYarn ? "yarn build" : "npm run build");
+    } catch {
+      console.error("Build failed.");
+      return;
+    }
+    console.error(`Done: dependencies ${doneVerb} and build succeeded.`);
+  } else {
+    if (opts.noBuild) {
+      console.error(`Done: dependencies ${doneVerb}. (Build skipped by --no-build.)`);
+    } else {
+      console.error(`Done: dependencies ${doneVerb}. Build skipped as no tsconfig.json was found. If a build is required, please run it manually.`);
+    }
   }
-
-  console.error("Done: dependencies updated and build succeeded.");
 }
