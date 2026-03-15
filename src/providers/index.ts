@@ -5,6 +5,8 @@ export interface ReviewRequest {
   language: string;
   /** Optional custom instructions (e.g. focus areas, style) for the reviewer. */
   customPrompt?: string;
+  /** If true, request minimal output (fewer sections, fewer tokens). */
+  compact?: boolean;
 }
 
 export interface ReviewResponse {
@@ -22,6 +24,8 @@ export interface FileComment {
   body: string;
   /** Severity hint. */
   severity: "critical" | "warning" | "suggestion" | "praise";
+  /** Optional suggested code (optimal fix or improvement). When present, can be shown as a code block. */
+  suggestionCode?: string;
 }
 
 export interface PerFileReviewResponse {

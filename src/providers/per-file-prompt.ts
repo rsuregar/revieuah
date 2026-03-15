@@ -1,39 +1,13 @@
 import type { FileComment, PerFileReviewResponse, ReviewRequest, RiskLevel } from "./index.js";
 
-const PER_FILE_SYSTEM = `You are ReviuAh, a senior software reviewer.
-You review git diffs and produce per-file inline comments in JSON format.
+const PER_FILE_SYSTEM = `You are ReviuAh, a code reviewer. Respond with ONLY a valid JSON object (no markdown, no fences).
 
-You MUST respond with ONLY a valid JSON object, no markdown fences, no extra text.
+Schema:
+{"summary":"one paragraph","risk":"low|medium|high","comments":[{"path":"rel/path.ts","line":42,"body":"issue or suggestion","severity":"critical|warning|suggestion|praise","suggestionCode":"optional snippet when a concrete fix or optimal code helps"}]}
 
-JSON schema:
-{
-  "summary": "One-paragraph overall summary of the changes.",
-  "risk": "low | medium | high",
-  "comments": [
-    {
-      "path": "relative/file/path.ts",
-      "line": 42,
-      "body": "Explanation of the issue or suggestion.",
-      "severity": "critical | warning | suggestion | praise"
-    }
-  ]
-}
-
-Severity definitions:
-- "critical": Bugs, security vulnerabilities, data loss, breaking changes. MUST be fixed.
-- "warning": Potential issues, performance concerns, bad practices. Should be fixed.
-- "suggestion": Minor improvements, readability, style. Nice to have.
-- "praise": Well-written code. Only include if truly outstanding.
-
-Rules:
-- "path" must match the file path from the diff header (e.g. b/src/foo.ts → src/foo.ts).
-- "line" is the line number in the NEW version of the file (right side of diff). Use 0 for file-level comments.
-- Only comment on lines that actually appear in the diff (added or modified).
-- Focus on real issues: bugs, security, performance, logic errors. Skip trivial formatting.
-- Only include comments with severity "critical" or "warning". Skip "suggestion" and "praise" unless the change is truly noteworthy.
-- If risk is "low" and there are no critical/warning issues, return an empty comments array.
-- Keep each "body" concise (1-3 sentences).
-- Do NOT wrap response in markdown code fences.`;
+Severity: critical = bugs/security/breaking, fix now. warning = issues/bad practices. suggestion/praise = omit unless noteworthy.
+Rules: path = from diff header (e.g. b/src/foo.ts → src/foo.ts). line = NEW file line (0 = file-level). Only comment on added/modified lines. Prefer critical/warning only; empty comments[] if low risk and no issues. Keep body 1-3 sentences.
+When your comment would benefit from showing optimal or fixed code, add "suggestionCode" with a short snippet (same line or few lines). Omit if the issue is conceptual only. Keep suggestionCode minimal and directly applicable.`;
 
 export function buildPerFilePrompt(request: ReviewRequest): { system: string; user: string } {
   const parts = [
@@ -63,6 +37,7 @@ export function parsePerFileResponse(raw: string): PerFileReviewResponse {
       line?: number;
       body?: string;
       severity?: string;
+      suggestionCode?: string;
     }>;
   };
 
@@ -94,6 +69,9 @@ export function parsePerFileResponse(raw: string): PerFileReviewResponse {
       severity: validSeverities.has(c.severity?.toLowerCase() ?? "")
         ? (c.severity!.toLowerCase() as FileComment["severity"])
         : "warning",
+      ...(typeof c.suggestionCode === "string" && c.suggestionCode.trim() && {
+        suggestionCode: c.suggestionCode.trim(),
+      }),
     }))
     .filter((c) => actionableSeverities.has(c.severity));
 
