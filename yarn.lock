@@ -364,6 +364,17 @@ pretty-ms@^9.2.0:
   dependencies:
     parse-ms "^4.0.0"
 
+reviuah@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/reviuah/-/reviuah-1.0.5.tgz#c06041723b4f7b433501555e913c5b17262df16c"
+  integrity sha512-hso68Pi3pKqMMlTg9e3lP3N9/NOuPoinFafvQZuaFsu+OLlPm96WeDHyfP5JgeOmlsbdZP7T+TXXdb5f29lExA==
+  dependencies:
+    blessed "^0.1.81"
+    commander "^12.1.0"
+    execa "^9.3.1"
+    openai "^4.67.3"
+    semver "^7.6.3"
+
 semver@^7.6.3:
   version "7.7.4"
   resolved "https://registry.yarnpkg.com/semver/-/semver-7.7.4.tgz#28464e36060e991fa7a11d0279d2d3f3b57a7e8a"

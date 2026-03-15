@@ -91,6 +91,7 @@ program
   .option("--lang <lang>", "output language", "en")
   .option("--out <file>", "write review markdown to file")
   .option("--per-file", "output per-file inline comments as JSON (for CI integration)", false)
+  .option("--prompt <text>", "custom instructions for the reviewer (e.g. focus on security, follow our style guide)")
   .action(
     async (options: {
       commit?: string;
@@ -100,6 +101,7 @@ program
       lang?: string;
       out?: string;
       perFile?: boolean;
+      prompt?: string;
     }) => {
       const result = await reviewCommand({
         commit: options.commit,
@@ -109,6 +111,7 @@ program
         lang: options.lang ?? "en",
         out: options.out,
         perFile: Boolean(options.perFile),
+        customPrompt: options.prompt,
       });
 
       if (options.strict && result.risk === "high") {

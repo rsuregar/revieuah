@@ -30,6 +30,8 @@ export interface ReviewCommandOptions {
   out?: string;
   /** Per-file mode: output JSON with inline comments instead of a single markdown blob. */
   perFile?: boolean;
+  /** Custom instructions for the reviewer (focus areas, style, etc.). */
+  customPrompt?: string;
 }
 
 export async function reviewCommand(
@@ -77,8 +79,13 @@ export async function reviewCommand(
   const credentials = await resolveReviewCredentials();
   const provider = createProvider(credentials);
 
+  const customPrompt =
+    options.customPrompt?.trim() ||
+    process.env.REVIUAH_CUSTOM_PROMPT?.trim() ||
+    undefined;
+
   printBanner();
-  const stopSpinner = startSpinner("Reviewing");
+  const stopSpinner = startSpinner("Generating review");
 
   if (options.perFile && provider.reviewPerFile) {
     let perFileResult: PerFileReviewResponse;
@@ -86,6 +93,7 @@ export async function reviewCommand(
       perFileResult = await provider.reviewPerFile({
         diff: trimmedDiff,
         language: options.lang,
+        customPrompt,
       });
     } finally {
       stopSpinner();
@@ -110,6 +118,7 @@ export async function reviewCommand(
     result = await provider.review({
       diff: trimmedDiff,
       language: options.lang,
+      customPrompt,
     });
   } finally {
     stopSpinner();
