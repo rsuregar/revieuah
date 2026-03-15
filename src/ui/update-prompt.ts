@@ -1,3 +1,4 @@
+/** blessed is unmaintained but widely used for TUI; listed in package.json dependencies */
 import blessed from "blessed";
 
 export interface UpdatePromptOptions {

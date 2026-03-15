@@ -64,6 +64,7 @@ export function getNewerVersions(
 
 function askYesNo(question: string): Promise<boolean> {
   return new Promise((resolve) => {
+    // Use stderr so prompt is visible when stdout is redirected (same as other update messages)
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stderr,

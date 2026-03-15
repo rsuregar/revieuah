@@ -32,6 +32,8 @@ ReviuAh can be added to any repository (GitHub or GitLab) to **automatically rev
 
 > `GITHUB_TOKEN` is already available; no need to add it manually.
 
+**Comment author:** With `GITHUB_TOKEN`, comments and reviews appear as **"github-actions bot"**. GitHub does not allow renaming this. To show a different author (e.g. your username or "ReviuAh"), use a [Personal Access Token (PAT)](https://github.com/settings/tokens) with `repo` scope: add it as a secret (e.g. `GH_PAT`) and in the workflow use `github-token: ${{ secrets.GH_PAT }}` instead of `secrets.GITHUB_TOKEN` in the steps that post comments. The comment will then appear as the user who created the PAT.
+
 ### Step 2 — Create Workflow File
 
 Create `.github/workflows/code-review.yml` in your repo with:
