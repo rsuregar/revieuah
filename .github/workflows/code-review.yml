@@ -21,14 +21,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
 
-      - name: Install ReviuAh (always latest)
-        run: npm install -g reviuah@latest
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies & build from source
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
 
       # 1. Overall summary review (posted as PR comment)
       - name: Run overall review
-        run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
+        run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
@@ -36,7 +41,7 @@ jobs:
 
       # 2. Per-file inline review (posted as PR review with inline comments)
       - name: Run per-file review
-        run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
+        run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
