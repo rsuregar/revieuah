@@ -6,6 +6,38 @@ import type {
   RiskLevel,
 } from "./index.js";
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+function getRequestTimeoutMs(): number {
+  const env = process.env.REVIUAH_REQUEST_TIMEOUT_MS;
+  if (env != null) {
+    const n = parseInt(env, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+function messageForStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return "Bad request (400). Periksa model/parameter.";
+    case 401:
+      return "Authentication failed (401). Periksa API key.";
+    case 403:
+      return "Forbidden (403). API key tidak punya akses.";
+    case 404:
+      return "Not found (404). Model atau endpoint salah.";
+    case 429:
+      return "Rate limit (429). Coba lagi nanti.";
+    case 500:
+    case 502:
+    case 503:
+      return `Server error (${status}). Coba lagi nanti.`;
+    default:
+      return `Request failed (${status}).`;
+  }
+}
+
 export interface OpenAIProviderOptions {
   apiKey: string;
   baseURL?: string;
@@ -119,9 +151,11 @@ export class OpenAIProvider implements Provider {
   private readonly model: string;
 
   constructor(options: OpenAIProviderOptions) {
+    const timeoutMs = getRequestTimeoutMs();
     this.client = new OpenAI({
       apiKey: options.apiKey,
       baseURL: options.baseURL,
+      timeout: timeoutMs,
     });
     this.model = options.model;
   }
@@ -129,26 +163,43 @@ export class OpenAIProvider implements Provider {
   async review(request: ReviewRequest): Promise<ReviewResponse> {
     const prompt = this.buildPrompt(request);
 
-    const response = await this.client.chat.completions.create({
-      model: this.model,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are ReviuAh, a senior software reviewer. You MUST output valid Markdown and strictly follow the required headings and order.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are ReviuAh, a senior software reviewer. You MUST output valid Markdown and strictly follow the required headings and order.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
 
-    const markdown = response.choices[0]?.message?.content?.trim() ?? "";
-    const risk = extractRiskLevel(markdown);
+      const markdown = response.choices[0]?.message?.content?.trim() ?? "";
+      const risk = extractRiskLevel(markdown);
 
-    return { markdown, risk };
+      return { markdown, risk };
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (typeof status === "number") {
+        throw new Error(messageForStatus(status));
+      }
+      if (err instanceof Error) {
+        if (err.name === "AbortError" || err.message?.includes("timeout")) {
+          const timeoutMs = getRequestTimeoutMs();
+          throw new Error(
+            `Request timeout setelah ${timeoutMs / 1000}s. Set REVIUAH_REQUEST_TIMEOUT_MS untuk mengubah.`,
+          );
+        }
+        throw err;
+      }
+      throw err;
+    }
   }
 
   private buildPrompt(request: ReviewRequest): string {

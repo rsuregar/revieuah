@@ -353,11 +353,21 @@ export class SetupWizard {
 
   private openInEditor(): void {
     const configPath = getUserConfigPath();
+    const editor =
+      process.env.EDITOR ||
+      process.env.VISUAL ||
+      (process.platform === "win32" ? "notepad" : "vim");
     this.screen.destroy();
-    const editor = process.env.EDITOR || process.env.VISUAL || "vim";
     const child = spawn(editor, [configPath], { stdio: "inherit" });
-    child.on("exit", () => {
+    child.on("error", () => {
+      console.error(
+        `Editor tidak ditemukan (EDITOR/VISUAL tidak diset). Buka file secara manual:\n  ${configPath}`,
+      );
       if (this.resolveForm) this.resolveForm(true);
+    });
+    child.on("exit", (code) => {
+      if (this.resolveForm) this.resolveForm(true);
+      if (code !== 0 && code != null) process.exitCode = code;
     });
   }
 

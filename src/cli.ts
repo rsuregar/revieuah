@@ -38,15 +38,25 @@ program
   .description(
     "Interactive: simpan API key & provider ke ~/.reviuah/config.json (dipakai jika env tidak diset)",
   )
-  .action(async () => {
-    await setupCommand();
+  .option("--wizard", "paksa form penuh (TUI) meski terminal tidak terdeteksi TTY")
+  .option("--no-wizard", "pakai prompt sederhana saja (tanpa TUI)")
+  .action(async (opts: { wizard?: boolean }) => {
+    await setupCommand({
+      noWizard: opts.wizard === false,
+      wizard: opts.wizard === true,
+    });
   });
 
 program
   .command("config")
   .description("Tampilkan lokasi file config dan status API key")
-  .action(async () => {
-    await configStatusCommand();
+  .option("--update", "buka setup untuk mengubah config (sama dengan reviuah setup)")
+  .action(async (opts: { update?: boolean }) => {
+    if (opts.update) {
+      await setupCommand();
+    } else {
+      await configStatusCommand();
+    }
   });
 
 program

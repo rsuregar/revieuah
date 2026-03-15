@@ -66,7 +66,7 @@ export async function checkForUpdates(): Promise<void> {
         `${YELLOW}\nNew version available: ${BOLD}${latestVersion}${RESET}${YELLOW} (current: ${currentVersion})${RESET}`,
       );
       console.log(
-        `${GRAY}Update manually with: npm install -g ${PACKAGE_NAME}@latest\n${RESET}`,
+        `${GRAY}Update: npm install -g ${PACKAGE_NAME}@latest  or  yarn global add ${PACKAGE_NAME}@latest\n${RESET}`,
       );
     }
   } catch {

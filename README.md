@@ -32,7 +32,10 @@ pnpm add -g reviuah
 reviuah setup
 ```
 
-Interactive setup saves config to `~/.reviuah/config.json`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
+Interactive setup menyimpan ke `~/.reviuah/config.json`.  
+- **Default:** wizard (form TUI) bila terminal interaktif; bila gagal, otomatis pakai prompt sederhana.  
+- `reviuah setup --no-wizard` = langsung prompt sederhana (untuk automation/script).  
+- **Ubah config:** `reviuah config --update` atau `reviuah setup`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
 
 **2. Run a review:**
 
@@ -61,7 +64,7 @@ reviuah --base main --out review.md
 
 **Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high). Run `reviuah --help` for full list.
 
-After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice (Commitah-style) and suggests updating with `npm install -g reviuah@latest`. (Skipped in CI.)
+After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice and suggests updating with `npm install -g reviuah@latest` or `yarn global add reviuah@latest`. (Skipped in CI.)
 
 ---
 
@@ -88,6 +91,7 @@ The CLI prints structured Markdown:
 | `REVIUAH_PROVIDER_URL` | Override API base URL |
 | `REVIUAH_MODEL` | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
+| `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in ms (default 60000). |
 
 Env overrides saved config (useful for CI).
 
