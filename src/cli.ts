@@ -118,8 +118,12 @@ program
   .option("--no-summary", "disable summary markdown review output")
   .option(
     "--compact",
-    "minimal review output (fewer sections, lower token usage)",
-    false,
+    "minimal review output (fewer sections, lower token usage) (default)",
+    true,
+  )
+  .option(
+    "--no-compact",
+    "disable compact mode and use the fuller review format",
   )
   .option(
     "--prompt <text>",
@@ -147,7 +151,7 @@ program
         out: options.out,
         perFile: Boolean(options.perFile),
         summary: options.summary,
-        compact: Boolean(options.compact),
+        compact: options.compact,
         customPrompt: options.prompt,
       });
 

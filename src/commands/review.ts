@@ -7,8 +7,8 @@ import {
   getRangeDiff,
   getRepoRoot,
   getStagedDiff,
-  prepareDiffForReview,
 } from "../git/diff.js";
+import { prepareDiffForReview } from "../git/prepare-diff.js";
 import type {
   PerFileReviewResponse,
   ReviewResponse,
@@ -26,6 +26,55 @@ function getMaxDiffSize(): number {
   const n = parseInt(env, 10);
   if (!Number.isFinite(n) || n < 1000) return DEFAULT_MAX_DIFF_SIZE;
   return Math.min(n, 500_000);
+}
+
+function getExtraDiffExcludePatterns(): string[] {
+  const raw = process.env.REVIUAH_DIFF_EXCLUDE_PATTERNS?.trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function isTokenLoggingEnabled(): boolean {
+  const raw = process.env.REVIUAH_LOG_TOKEN_BUDGET?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function logPreparedDiffBudget(
+  originalDiff: string,
+  preparedDiff: {
+    originalLength: number;
+    finalLength: number;
+    estimatedInputTokens: number;
+    skippedFiles: string[];
+    keptFiles: string[];
+    truncated: boolean;
+  },
+): void {
+  if (!isTokenLoggingEnabled()) return;
+
+  const originalTokens = Math.ceil(originalDiff.length / 4);
+  const reductionChars = Math.max(
+    0,
+    preparedDiff.originalLength - preparedDiff.finalLength,
+  );
+  const reductionTokens = Math.max(
+    0,
+    originalTokens - preparedDiff.estimatedInputTokens,
+  );
+
+  console.error(
+    [
+      "ReviuAh token budget:",
+      `chars ${preparedDiff.originalLength} -> ${preparedDiff.finalLength} (-${reductionChars})`,
+      `est tokens ${originalTokens} -> ${preparedDiff.estimatedInputTokens} (-${reductionTokens})`,
+      `kept files ${preparedDiff.keptFiles.length}`,
+      `filtered files ${preparedDiff.skippedFiles.length}`,
+      `truncated ${preparedDiff.truncated ? "yes" : "no"}`,
+    ].join(" | "),
+  );
 }
 
 export interface ReviewCommandOptions {
@@ -55,10 +104,7 @@ export async function reviewCommand(
     await validateOutPath(options.out);
   }
 
-  const compact =
-    options.compact === true ||
-    process.env.REVIUAH_COMPACT?.trim() === "1" ||
-    process.env.REVIUAH_COMPACT?.trim()?.toLowerCase() === "true";
+  const compact = resolveCompactMode(options.compact);
 
   const diff = await resolveDiff(options, compact);
 
@@ -92,7 +138,11 @@ export async function reviewCommand(
   }
 
   const maxSize = getMaxDiffSize();
-  const preparedDiff = prepareDiffForReview(diff, maxSize);
+  const preparedDiff = prepareDiffForReview(diff, {
+    maxSize,
+    extraExcludePatterns: getExtraDiffExcludePatterns(),
+  });
+  logPreparedDiffBudget(diff, preparedDiff);
   const trimmedDiff = preparedDiff.diff;
 
   const credentials = await resolveReviewCredentials();
@@ -230,6 +280,15 @@ function resolveSummaryEnabled(cliSummary?: boolean): boolean {
   if (cliSummary === true) return true;
 
   const env = process.env.REVIUAH_ENABLE_SUMMARY?.trim().toLowerCase();
+  if (!env) return true;
+  return !(env === "0" || env === "false" || env === "no");
+}
+
+function resolveCompactMode(cliCompact?: boolean): boolean {
+  if (cliCompact === false) return false;
+  if (cliCompact === true) return true;
+
+  const env = process.env.REVIUAH_COMPACT?.trim().toLowerCase();
   if (!env) return true;
   return !(env === "0" || env === "false" || env === "no");
 }

@@ -37,6 +37,8 @@ Interactive setup saves config to `~/.reviuah/config.json`. You can also set `RE
 
 ```bash
 # Review staged changes (after git add)
+# Default behavior follows ReviuAh best practice:
+# compact review + smaller diff context for lower token usage
 reviuah
 
 # Review current branch vs main
@@ -60,6 +62,8 @@ reviuah --base main --prompt "Focus on security and SQL injection risks."
 | Git range              | `reviuah --range main...HEAD`         |
 | Current branch vs base | `reviuah --base main`                 |
 | Fail CI if high risk   | `reviuah --base origin/main --strict` |
+
+By default, `reviuah` follows the recommended low-token path: compact review output with smaller diff context. Use `--compact` for clarity in scripts if you want to be explicit, or `--no-compact` if you want the fuller review style.
 
 **Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high), `--summary` / `--no-summary`, `--prompt <text>` (custom instructions for the reviewer). Run `reviuah --help` for full list.
 
@@ -89,14 +93,16 @@ The CLI prints structured Markdown:
 | `REVIUAH_PROVIDER`           | Preset: `agentrouter`, `openai`, `gemini`, `deepseek`, `ollama`, etc. Default: `agentrouter`                      |
 | `REVIUAH_PROVIDER_URL`       | Override API base URL                                                                                             |
 | `REVIUAH_MODEL`              | Override model name                                                                                               |
-| `REVIUAH_MAX_DIFF_SIZE`      | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper.                          |
+| `REVIUAH_MAX_DIFF_SIZE`      | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper after ReviuAh filters and prioritizes diff sections. |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000).                                                     |
 | `REVIUAH_ENABLE_SUMMARY`     | Set to `0` / `false` to disable summary markdown generation (same effect as `--no-summary`). Default enabled.     |
-| `REVIUAH_COMPACT`            | Set to `1` or `true` for minimal review output. Same as `--compact`. It also uses a smaller git diff context to reduce input tokens. |
+| `REVIUAH_COMPACT`            | Compact mode is the default best-practice behavior for `reviuah`. Set to `0` / `false` to opt out, or `1` / `true` to force it explicitly. Same as `--compact` / `--no-compact`. |
 | `REVIUAH_MAX_OUTPUT_TOKENS`  | Cap completion length (e.g. `2000`). Reduces output tokens; may truncate long reviews.                            |
+| `REVIUAH_DIFF_EXCLUDE_PATTERNS` | Extra comma-separated regex patterns for diff paths to exclude before sending to the model. Useful in CI for repo-specific generated files. |
+| `REVIUAH_LOG_TOKEN_BUDGET`   | Set to `1` / `true` to print a stderr summary of diff chars, estimated input tokens, kept files, filtered files, and truncation status. |
 | `REVIUAH_CUSTOM_PROMPT`      | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
 
-**Reducing token usage:** Use `--compact` or `REVIUAH_COMPACT=1` for shorter reviews and smaller diff context. Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. ReviuAh also filters token-heavy files such as lockfiles, build outputs, minified assets, and common binaries before sending the diff, and when truncation is still needed it trims at file boundaries instead of hard-cutting raw text. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length.
+**Reducing token usage:** `reviuah` now uses the best-practice compact path by default, so you automatically get shorter reviews and smaller diff context. Use `--no-compact` or `REVIUAH_COMPACT=0` if you want fuller review output instead. You can still lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. ReviuAh also filters token-heavy files such as lockfiles, build outputs, minified assets, and common binaries before sending the diff, prioritizes higher-signal code files over low-signal docs/config when truncation is needed, and trims at file boundaries instead of hard-cutting raw text. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length. For repo-specific noise, set `REVIUAH_DIFF_EXCLUDE_PATTERNS` to exclude extra paths, and enable `REVIUAH_LOG_TOKEN_BUDGET=1` to inspect the prepared diff budget in CI logs.
 
 **Prompt file:** If neither `--prompt` nor `REVIUAH_CUSTOM_PROMPT` is set, ReviuAh looks for `reviuah-prompt.md` in the **git repo root** and uses its contents as the custom prompt. Use this to share review instructions with your team (commit the file).
 
