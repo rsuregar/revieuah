@@ -13,3 +13,10 @@ export interface ReviewResponse {
 export interface Provider {
   review(request: ReviewRequest): Promise<ReviewResponse>;
 }
+
+/** Credentials used to create a provider (e.g. from config + env). */
+export interface ProviderCredentials {
+  apiKey: string;
+  baseURL: string;
+  model: string;
+}

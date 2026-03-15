@@ -23,9 +23,10 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     baseURL: "https://api.anthropic.com/v1",
     defaultModel: "claude-sonnet-4-5",
   },
+  /** OpenAI-compatible; native API is .../v1beta/models/gemini-flash-latest:generateContent */
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-flash-latest",
   },
   deepseek: {
     baseURL: "https://api.deepseek.com",

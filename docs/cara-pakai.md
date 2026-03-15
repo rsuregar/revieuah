@@ -14,10 +14,13 @@ Prioritas: **variabel lingkungan** mengoverride isi file (berguna di CI).
 
 ## Install
 
-- **npm:** `npm install -g reviuah`
-- **yarn:** `yarn global add reviuah`
-- **pnpm:** `pnpm add -g reviuah`
-- **Tanpa global:** `npx reviuah …`
+Jika `npm install -g reviuah` **404** → paket belum di npm. Pakai:
+
+```bash
+npm install -g git+https://github.com/rsuregar/reviewah.git
+```
+
+Setelah terbit di npm: `npm install -g reviuah`. Tanpa global dari npm: `npx reviuah` (hanya jika sudah publish).
 
 Perintah **`reviewah`** sama dengan **`reviuah`**.
 
@@ -47,9 +50,5 @@ reviuah --base origin/main --out review.md
 
 ## Publish npm (maintainer)
 
-Workflow: GitHub Actions **Publish to npm** (butuh secret `NPM_TOKEN`), atau lokal:
-
-```bash
-yarn build
-npm publish --access public
-```
+- **Otomatis:** Setiap **merge ke `main`**, workflow **Publish to npm** jalan: bump patch → publish → push tag. Butuh secret **`NPM_TOKEN`** di repo (Settings → Secrets → Actions).
+- **Manual:** Tab Actions → Publish to npm → Run workflow (pilih patch/minor/major), atau lokal: `yarn build && npm publish --access public`.

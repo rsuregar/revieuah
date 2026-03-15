@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "AI-powered Git diff reviewer CLI — staged, branch vs base, CI-friendly",
   "license": "MIT",
-  "author": "",
+  "author": "rsuregar",
   "repository": {
     "type": "git",
     "url": "https://github.com/rsuregar/reviewah.git"
@@ -24,17 +24,23 @@
     "reviuah": "dist/cli.js",
     "reviewah": "dist/cli.js"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
     "start": "node dist/cli.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "node -e \"const f=require('fs');const{execSync}=require('child_process');if(f.existsSync('tsconfig.json')&&f.existsSync('src'))execSync('npm run build',{stdio:'inherit'})\""
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@inquirer/select": "^5.1.0",
     "commander": "^12.1.0",
     "execa": "^9.3.1",
     "openai": "^4.67.3"
