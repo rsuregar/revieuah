@@ -2,8 +2,17 @@ import { writeFile, access, mkdir, stat, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { execa } from "execa";
-import { getCommitDiff, getRangeDiff, getRepoRoot, getStagedDiff } from "../git/diff.js";
-import type { PerFileReviewResponse, ReviewResponse } from "../providers/index.js";
+import {
+  getCommitDiff,
+  getRangeDiff,
+  getRepoRoot,
+  getStagedDiff,
+} from "../git/diff.js";
+import { prepareDiffForReview } from "../git/prepare-diff.js";
+import type {
+  PerFileReviewResponse,
+  ReviewResponse,
+} from "../providers/index.js";
 import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
 import { printBanner } from "../ui/logo.js";
@@ -17,6 +26,55 @@ function getMaxDiffSize(): number {
   const n = parseInt(env, 10);
   if (!Number.isFinite(n) || n < 1000) return DEFAULT_MAX_DIFF_SIZE;
   return Math.min(n, 500_000);
+}
+
+function getExtraDiffExcludePatterns(): string[] {
+  const raw = process.env.REVIUAH_DIFF_EXCLUDE_PATTERNS?.trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function isTokenLoggingEnabled(): boolean {
+  const raw = process.env.REVIUAH_LOG_TOKEN_BUDGET?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function logPreparedDiffBudget(
+  originalDiff: string,
+  preparedDiff: {
+    originalLength: number;
+    finalLength: number;
+    estimatedInputTokens: number;
+    skippedFiles: string[];
+    keptFiles: string[];
+    truncated: boolean;
+  },
+): void {
+  if (!isTokenLoggingEnabled()) return;
+
+  const originalTokens = Math.ceil(originalDiff.length / 4);
+  const reductionChars = Math.max(
+    0,
+    preparedDiff.originalLength - preparedDiff.finalLength,
+  );
+  const reductionTokens = Math.max(
+    0,
+    originalTokens - preparedDiff.estimatedInputTokens,
+  );
+
+  console.error(
+    [
+      "ReviuAh token budget:",
+      `chars ${preparedDiff.originalLength} -> ${preparedDiff.finalLength} (-${reductionChars})`,
+      `est tokens ${originalTokens} -> ${preparedDiff.estimatedInputTokens} (-${reductionTokens})`,
+      `kept files ${preparedDiff.keptFiles.length}`,
+      `filtered files ${preparedDiff.skippedFiles.length}`,
+      `truncated ${preparedDiff.truncated ? "yes" : "no"}`,
+    ].join(" | "),
+  );
 }
 
 export interface ReviewCommandOptions {
@@ -46,7 +104,9 @@ export async function reviewCommand(
     await validateOutPath(options.out);
   }
 
-  const diff = await resolveDiff(options);
+  const compact = resolveCompactMode(options.compact);
+
+  const diff = await resolveDiff(options, compact);
 
   if (!diff) {
     const emptyMarkdown = [
@@ -78,19 +138,23 @@ export async function reviewCommand(
   }
 
   const maxSize = getMaxDiffSize();
-  const trimmedDiff = trimDiff(diff, maxSize);
+  const preparedDiff = prepareDiffForReview(diff, {
+    maxSize,
+    extraExcludePatterns: getExtraDiffExcludePatterns(),
+  });
+  logPreparedDiffBudget(diff, preparedDiff);
+  const trimmedDiff = preparedDiff.diff;
 
   const credentials = await resolveReviewCredentials();
   const provider = createProvider(credentials);
 
   const customPrompt = await resolveCustomPrompt(options.customPrompt);
-  const compact =
-    options.compact === true ||
-    (process.env.REVIUAH_COMPACT?.trim() === "1" || process.env.REVIUAH_COMPACT?.trim()?.toLowerCase() === "true");
   const summaryEnabled = resolveSummaryEnabled(options.summary);
 
   if (!options.perFile && !summaryEnabled) {
-    console.error("ReviuAh: summary generation disabled (--no-summary or REVIUAH_ENABLE_SUMMARY=0).");
+    console.error(
+      "ReviuAh: summary generation disabled (--no-summary or REVIUAH_ENABLE_SUMMARY=0).",
+    );
     return { markdown: "", risk: "unknown" };
   }
 
@@ -113,7 +177,11 @@ export async function reviewCommand(
     if (options.out) {
       const absolute = resolve(process.cwd(), options.out);
       const parent = dirname(absolute);
-      try { await mkdir(parent, { recursive: true }); } catch { /* ok */ }
+      try {
+        await mkdir(parent, { recursive: true });
+      } catch {
+        /* ok */
+      }
       await writeFile(absolute, json, "utf8");
       console.error(`ReviuAh: per-file review written to ${options.out}`);
     } else {
@@ -150,9 +218,10 @@ async function validateOutPath(outPath: string): Promise<void> {
   try {
     await access(parent, constants.W_OK);
   } catch (err) {
-    const code = err && typeof (err as NodeJS.ErrnoException).code === "string"
-      ? (err as NodeJS.ErrnoException).code
-      : "access denied";
+    const code =
+      err && typeof (err as NodeJS.ErrnoException).code === "string"
+        ? (err as NodeJS.ErrnoException).code
+        : "access denied";
     if (code === "ENOENT") {
       throw new Error(
         `--out path invalid: directory does not exist: ${parent}. Create the directory or choose a different path.`,
@@ -169,10 +238,12 @@ async function validateOutPath(outPath: string): Promise<void> {
       await access(absolute, constants.W_OK);
     }
   } catch (err) {
-    const code = err && typeof (err as NodeJS.ErrnoException).code === "string"
-      ? (err as NodeJS.ErrnoException).code
-      : "";
-    if (code === "ENOENT") return; /* file doesn't exist yet; parent is writable */
+    const code =
+      err && typeof (err as NodeJS.ErrnoException).code === "string"
+        ? (err as NodeJS.ErrnoException).code
+        : "";
+    if (code === "ENOENT")
+      return; /* file doesn't exist yet; parent is writable */
     if (code === "EACCES" || code === "EPERM") {
       throw new Error(
         `--out path not writable: cannot write to existing file ${absolute}. Check permissions.`,
@@ -213,6 +284,15 @@ function resolveSummaryEnabled(cliSummary?: boolean): boolean {
   return !(env === "0" || env === "false" || env === "no");
 }
 
+function resolveCompactMode(cliCompact?: boolean): boolean {
+  if (cliCompact === false) return false;
+  if (cliCompact === true) return true;
+
+  const env = process.env.REVIUAH_COMPACT?.trim().toLowerCase();
+  if (!env) return true;
+  return !(env === "0" || env === "false" || env === "no");
+}
+
 async function ensureGitRepository(): Promise<void> {
   const check = await execa("git", ["rev-parse", "--is-inside-work-tree"], {
     reject: false,
@@ -222,7 +302,10 @@ async function ensureGitRepository(): Promise<void> {
   }
 }
 
-async function resolveDiff(options: ReviewCommandOptions): Promise<string> {
+async function resolveDiff(
+  options: ReviewCommandOptions,
+  compact = false,
+): Promise<string> {
   const modes = [
     Boolean(options.commit),
     Boolean(options.range),
@@ -234,27 +317,21 @@ async function resolveDiff(options: ReviewCommandOptions): Promise<string> {
     );
   }
 
+  const contextLines = compact ? 1 : 3;
+
   if (options.commit) {
-    return getCommitDiff(options.commit);
+    return getCommitDiff(options.commit, { contextLines });
   }
 
   if (options.range) {
-    return getRangeDiff(options.range);
+    return getRangeDiff(options.range, { contextLines });
   }
 
   if (options.base) {
-    return getRangeDiff(`${options.base}...HEAD`);
+    return getRangeDiff(`${options.base}...HEAD`, { contextLines });
   }
 
-  return getStagedDiff();
-}
-
-function trimDiff(diff: string, maxSize: number): string {
-  if (diff.length <= maxSize) {
-    return diff;
-  }
-
-  return `${diff.slice(0, maxSize)}\n\n[Diff truncated to ${maxSize} characters]`;
+  return getStagedDiff({ contextLines });
 }
 
 const PROMPT_FILE_NAME = "reviuah-prompt.md";
@@ -262,7 +339,9 @@ const PROMPT_FILE_NAME = "reviuah-prompt.md";
 /**
  * Resolve custom prompt: CLI --prompt > env REVIUAH_CUSTOM_PROMPT > repo root reviuah-prompt.md.
  */
-async function resolveCustomPrompt(cliPrompt?: string): Promise<string | undefined> {
+async function resolveCustomPrompt(
+  cliPrompt?: string,
+): Promise<string | undefined> {
   const fromCli = cliPrompt?.trim();
   if (fromCli) return fromCli;
 

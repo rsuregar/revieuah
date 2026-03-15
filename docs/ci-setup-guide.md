@@ -305,6 +305,23 @@ For large repos, limit the diff sent to the LLM:
 REVIUAH_MAX_DIFF_SIZE: 60000   # characters (default 120000)
 ```
 
+ReviuAh also reduces token usage before sending the diff:
+- uses compact/token-optimized review behavior by default for the standard `reviuah` command
+- filters token-heavy files such as lockfiles, build artifacts, minified assets, and common binary files
+- preserves whole file sections when truncating, instead of hard-cutting raw diff text
+- prioritizes higher-signal code sections before lower-signal files when the diff must be truncated
+- uses smaller diff context in compact mode to reduce prompt size further
+
+You can further tune CI token usage with these optional variables. If you want to keep the default best-practice behavior, no extra setting is needed:
+
+```yaml
+# Additional regex patterns to exclude from diff payloads before review
+REVIUAH_DIFF_EXCLUDE_PATTERNS: "storybook-static/,fixtures/,snapshots/,package\\.json"
+
+# Log estimated input token budget and diff reduction stats to CI logs
+REVIUAH_LOG_TOKEN_BUDGET: "1"
+```
+
 ### Enable/Disable Summary
 
 Use `REVIUAH_ENABLE_SUMMARY` to control summary generation in CI workflows:
@@ -353,7 +370,7 @@ On GitHub, the PR check will fail (❌). On GitLab, the pipeline will fail.
 | 401 from LLM | API key wrong or expired. In GitLab, if **REVIUAH_API_KEY** is Protected and the MR branch is not protected, the variable is not exposed — uncheck Protected or use a protected branch. |
 | 403 when posting comment (GitHub) | Ensure `permissions: pull-requests: write` is in the workflow. |
 | 403 when posting comment (GitLab) | **GITLAB_TOKEN** must be a Personal or Project token with **api** scope. CI_JOB_TOKEN is not enough. Create a new token if needed. |
-| Diff too large | Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. 40000). |
+| Diff too large | Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. 40000). You can also set `REVIUAH_DIFF_EXCLUDE_PATTERNS` to filter extra low-value files from the diff payload. |
 | Empty review | Ensure `fetch-depth: 0` (GitHub) or `GIT_DEPTH: 0` (GitLab). |
 | review.md is 0 bytes / empty | The LLM returned no content. ReviuAh will not write the file and will print a warning. Check provider, model, and rate limits; try again. In CI, the comment step will be skipped. |
 

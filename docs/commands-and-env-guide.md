@@ -43,16 +43,20 @@ Example ranges: `origin/main...HEAD`, `develop...feature/foo`.
 | `--strict` | `false` | Exit with code 1 when risk level is **high** (for CI gate) |
 | `--per-file` | `false` | Output JSON with per-line comments (for CI inline comments) |
 | `--summary` / `--no-summary` | `true` | Enable/disable summary markdown generation |
+| `--compact` / `--no-compact` | `true` | Compact review mode is now the default best-practice behavior. Use `--no-compact` to opt out and request the fuller review format. |
 | `--prompt <text>` | — | Custom instructions for the reviewer (e.g. focus on security, style guide). Or use a file in repo root (see below). |
 
 ### Example combinations
 
 ```bash
-# Staged only, Indonesian
+# Staged only, Indonesian (compact mode is on by default)
 reviuah --lang id
 
 # Branch vs main, save to file
 reviuah --base main --out review.md
+
+# Opt out of compact mode for a fuller review
+reviuah --base main --no-compact
 
 # Explicit range + custom prompt
 reviuah --range origin/main...HEAD --prompt "Focus on security and error handling."
@@ -145,9 +149,13 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_PROVIDER` | No | `agentrouter` | Preset: `openai`, `gemini`, `anthropic`, `deepseek`, `groq`, `mistral`, `together`, `fireworks`, `openrouter`, `cerebras`, `glm`, `ollama`, `agentrouter` |
 | `REVIUAH_PROVIDER_URL` | No | from preset | Override API base URL |
 | `REVIUAH_MODEL` | No | from preset | Override model name |
-| `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent (smaller = cheaper) |
+| `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent after ReviuAh filters token-heavy files, prioritizes higher-signal files, and truncates at file boundaries (smaller = cheaper) |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | No | 60000 | Request timeout to API (ms) |
 | `REVIUAH_ENABLE_SUMMARY` | No | enabled | Set `0` / `false` to disable summary markdown generation (same as `--no-summary`) |
+| `REVIUAH_COMPACT` | No | enabled | Compact review mode is the default best-practice behavior. Set `0` / `false` to disable it, or use `--no-compact` from the CLI. |
+| `REVIUAH_MAX_OUTPUT_TOKENS` | No | provider default | Cap completion length (for example `1500`) to reduce output tokens |
+| `REVIUAH_DIFF_EXCLUDE_PATTERNS` | No | — | Extra comma-separated regex patterns for diff paths to exclude before sending to the LLM (for example `(^|/)fixtures/,\\.snap$`) |
+| `REVIUAH_LOG_TOKEN_BUDGET` | No | disabled | Set `1` / `true` to print an estimated input token budget summary after diff preparation |
 | `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. |
 
 ### Example usage with env
@@ -163,11 +171,45 @@ reviuah --range origin/main...HEAD --out review.md
 # Limit diff size (save tokens)
 REVIUAH_MAX_DIFF_SIZE=50000 reviuah --base main
 
+# Compact mode is the default best-practice behavior
+reviuah --base main
+
+# Disable compact mode explicitly
+REVIUAH_COMPACT=0 reviuah --base main
+
+# Cap output tokens
+REVIUAH_MAX_OUTPUT_TOKENS=1500 reviuah --base main
+
+# Exclude extra low-value paths from the diff
+REVIUAH_DIFF_EXCLUDE_PATTERNS="(^|/)fixtures/,\\.snap$" reviuah --base main
+
+# Log estimated prompt budget to stderr
+REVIUAH_LOG_TOKEN_BUDGET=1 reviuah --base main
+
 # Disable summary generation from env
 REVIUAH_ENABLE_SUMMARY=0 reviuah --base main --out review.md
 ```
 
+### Token optimization notes
+
+ReviuAh now reduces prompt size more intelligently before sending a review request:
+
+- Filters token-heavy files such as lockfiles, build artifacts, minified assets, and common binary files from the diff.
+- Lets you exclude additional paths with `REVIUAH_DIFF_EXCLUDE_PATTERNS` using comma-separated regex patterns.
+- Prioritizes higher-signal file sections when the diff is still too large, so source code is more likely to be kept than low-signal docs or config churn.
+- Truncates large diffs at file boundaries instead of hard-cutting raw text mid-file.
+- Uses compact mode by default as the best-practice review path, which keeps output shorter and uses smaller git diff context to reduce tokens further.
+- You can opt out with `--no-compact` or `REVIUAH_COMPACT=0` when you want the fuller review format.
+- Can print an estimated input token budget with `REVIUAH_LOG_TOKEN_BUDGET=1`, which is useful in CI tuning.
+
+For the lowest token usage in CI, combine these settings:
+
+```bash
+REVIUAH_MAX_DIFF_SIZE=50000 REVIUAH_MAX_OUTPUT_TOKENS=1500 REVIUAH_DIFF_EXCLUDE_PATTERNS="(^|/)fixtures/,\\.snap$" reviuah --base main
+```
+
 ---
+
 
 ## AgentRouter: testing with curl
 
