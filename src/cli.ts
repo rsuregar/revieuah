@@ -59,16 +59,10 @@ program
     }
   });
 
+// All commands (setup, config, version, update) are visible in --help by default.
 program
-  .command("update")
-  .description("Update dependensi lalu build ulang (untuk development / setelah pull)")
-  .action(async () => {
-    await updateCommand();
-  });
-
-program
-  .command("version <type>", { hidden: false })
-  .description("Bump version: patch (bugfix), minor (fitur baru), major (breaking)")
+  .command("version <type>")
+  .description("Bump package version: patch | minor | major (untuk release)")
   .action(async (type: string) => {
     const t = type?.toLowerCase();
     if (t !== "patch" && t !== "minor" && t !== "major") {
@@ -77,6 +71,13 @@ program
       return;
     }
     await versionBumpCommand(t as "patch" | "minor" | "major");
+  });
+
+program
+  .command("update")
+  .description("Update dependensi lalu build ulang (development / setelah pull)")
+  .action(async () => {
+    await updateCommand();
   });
 
 program

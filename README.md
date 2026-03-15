@@ -62,7 +62,9 @@ reviuah --base main --out review.md
 | Current branch vs base | `reviuah --base main` |
 | Fail CI if high risk | `reviuah --base origin/main --strict` |
 
-**Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high). Run `reviuah --help` for full list.
+**Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high).
+
+**Commands:** `setup` (config wizard), `config` / `config --update` (lihat/ubah config), `version patch|minor|major` (bump versi untuk release), `update` (dependensi + build, untuk development). Run `reviuah --help` for full list.
 
 After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice and suggests updating with `npm install -g reviuah@latest` or `yarn global add reviuah@latest`. (Skipped in CI.)
 

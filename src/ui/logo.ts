@@ -2,14 +2,11 @@
 const PINK = "\x1b[35m";
 const RESET = "\x1b[0m";
 
-/** ASCII art banner — ReviuAh in block style. */
+/** ASCII banner: clearly reads "REVIUAH" (no block letters to avoid misread). */
 const BANNER = `
-${PINK}  ____  ______  _   _ _    _    _   _ 
- |  _ \\|  ____|| | | | |  / \\  | | | |
- | |_) | |__   | | | | | / _ \\ | | | |
- |  _ <|  __|  | | | | |/ ___ \\| | | |__
- | |_) | |____ | |_| | |  \\/   \\  \\ \\  /
- |____/|______| \\___/|_|\\_/ \\_/ \\___/ ${RESET}
+${PINK}  +-------------+
+  |  REVIUAH   |
+  +-------------+${RESET}
 `;
 
 export function printBanner(): void {
