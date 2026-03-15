@@ -1,15 +1,35 @@
 {
   "name": "reviuah",
   "version": "0.1.0",
-  "description": "AI-powered Git diff reviewer CLI",
+  "description": "AI-powered Git diff reviewer CLI — staged, branch vs base, CI-friendly",
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rsuregar/reviewah.git"
+  },
+  "keywords": [
+    "cli",
+    "git",
+    "diff",
+    "code-review",
+    "ai",
+    "llm",
+    "openai",
+    "pre-commit",
+    "ci"
+  ],
   "type": "module",
   "bin": {
-    "reviuah": "dist/cli.js"
+    "reviuah": "dist/cli.js",
+    "reviewah": "dist/cli.js"
   },
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "node": ">=18"

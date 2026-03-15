@@ -60,9 +60,19 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     defaultModel: "glm-4.7",
   },
   ollama: { baseURL: "http://localhost:11434/v1", defaultModel: "llama3.1" },
+  /** OpenAI-compatible: https://agentrouter.org/v1 */
+  agentrouter: {
+    baseURL: "https://agentrouter.org/v1",
+    defaultModel: "gpt-4o",
+  },
 };
 
-const DEFAULT_PROVIDER = "gemini";
+/** Default bila env/config tidak menyebut provider (AgentRouter). */
+const DEFAULT_PROVIDER = "agentrouter";
+
+export function listProviderIds(): string[] {
+  return Object.keys(PROVIDER_TEMPLATES).sort();
+}
 
 export function resolveProviderDefaults(
   providerName?: string,
