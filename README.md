@@ -19,7 +19,7 @@ Or with yarn:
 yarn global add reviuah
 ```
 
-**Requirements:** Node.js 20+, Git. Commands: `reviuah` or `reviewah` (same).
+**Requirements:** Node.js 20+ (22 LTS recommended; CI uses Node 22). Git. Commands: `reviuah` or `reviewah` (same).
 
 ---
 

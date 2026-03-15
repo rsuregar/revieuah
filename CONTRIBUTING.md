@@ -66,6 +66,11 @@ Provider presets live in `src/providers/openai.ts` inside the `PROVIDER_PRESETS`
 2. Update the setup wizard's template list in `src/ui/setup-wizard.ts`.
 3. Update `README.md` environment variables table if needed.
 
+## Package maintenance
+
+- **Do not add `reviuah` as a dependency** in `package.json`. This package is the CLI itself; a self-dependency is invalid and was removed intentionally. After any dependency change, run `yarn build` to confirm the app still builds.
+- CI uses **Node.js 22 LTS** for stability; keep workflows and `engines` in sync.
+
 ## Reporting issues
 
 - Use [GitHub Issues](https://github.com/rsuregar/reviewah/issues).
