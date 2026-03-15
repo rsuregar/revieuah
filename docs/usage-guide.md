@@ -52,3 +52,15 @@ reviuah --base origin/main --out review.md
 
 - **Automatic:** On every **merge to `main`**, the **Publish to npm** workflow runs: bump patch → publish → push tag. Requires **`NPM_TOKEN`** secret in the repo (Settings → Secrets → Actions).
 - **Manual:** Actions tab → Publish to npm → Run workflow (choose patch/minor/major), or locally: `yarn build && npm publish --access public`.
+
+## `reviuah update` (development)
+
+Updates dependencies and rebuilds the ReviuAh project. **Run from the ReviuAh repo root.** If you see "package.json not found", you are either in the wrong directory or using an old global install. Use one of:
+
+```bash
+# From ReviuAh repo root (recommended)
+yarn build && node dist/cli.js update
+
+# Or reinstall global from current source, then run from repo root
+cd /path/to/reviewah && npm install -g . && reviuah update
+```
