@@ -1,40 +1,40 @@
-# Panduan Memasang ReviuAh di Repo Lain
+# ReviuAh CI Setup — Install in Your Repo
 
-ReviuAh bisa dipasang di repo mana saja (GitHub atau GitLab) agar **otomatis review dan komentar** di setiap Pull Request / Merge Request.
+ReviuAh can be added to any repository (GitHub or GitLab) to **automatically review and comment** on every Pull Request or Merge Request.
 
-**Dua mode review:**
-- **Summary** — satu komentar ringkasan keseluruhan di PR/MR.
-- **Per-file** (`--per-file`) — komentar inline langsung di baris kode yang bermasalah, seperti reviewer manusia.
+**Two review modes:**
+- **Summary** — a single overall summary comment on the PR/MR.
+- **Per-file** (`--per-file`) — inline comments on specific lines of code, like a human reviewer.
 
 ---
 
-## Persiapan (Semua Platform)
+## Prerequisites (All Platforms)
 
-1. **Dapatkan API key** dari provider LLM yang kamu pakai.
+1. **Get an API key** from your LLM provider.
    - Gemini: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
    - OpenAI: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-   - Provider lain: lihat dokumentasi masing-masing.
+   - Other providers: see their documentation.
 
-2. **Simpan API key sebagai secret/variable** di platform CI (langkah di bawah).
+2. **Store the API key as a secret/variable** in your CI platform (steps below).
 
 ---
 
 ## GitHub Actions
 
-### Langkah 1 — Tambah Secret
+### Step 1 — Add Secret
 
-1. Buka repo di GitHub → **Settings** → **Secrets and variables** → **Actions**.
-2. Klik **New repository secret**.
-3. Isi:
+1. Open your repo on GitHub → **Settings** → **Secrets and variables** → **Actions**.
+2. Click **New repository secret**.
+3. Fill in:
    - Name: `REVIUAH_API_KEY`
-   - Value: API key kamu
-4. Klik **Add secret**.
+   - Value: your API key
+4. Click **Add secret**.
 
-> `GITHUB_TOKEN` sudah otomatis tersedia, tidak perlu ditambah manual.
+> `GITHUB_TOKEN` is already available; no need to add it manually.
 
-### Langkah 2 — Buat File Workflow
+### Step 2 — Create Workflow File
 
-Buat file `.github/workflows/code-review.yml` di repo kamu dengan isi:
+Create `.github/workflows/code-review.yml` in your repo with:
 
 ```yaml
 name: AI Code Review
@@ -64,9 +64,9 @@ jobs:
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
-          # Ganti provider sesuai kebutuhan (contoh: Gemini)
+          # Change provider as needed (e.g. Gemini)
           # REVIUAH_PROVIDER: gemini
-          # Batas ukuran diff (opsional, default 120000)
+          # Diff size limit (optional, default 120000)
           # REVIUAH_MAX_DIFF_SIZE: 60000
 
       - name: Post review comment
@@ -104,7 +104,7 @@ jobs:
             }
 ```
 
-### Langkah 3 — Commit & Push
+### Step 3 — Commit & Push
 
 ```bash
 git add .github/workflows/code-review.yml
@@ -112,30 +112,30 @@ git commit -m "ci: add ReviuAh auto review on PR"
 git push
 ```
 
-### Langkah 4 — Buat PR untuk Tes
+### Step 4 — Test with a PR
 
-Buat branch baru, ubah file apa saja, buat Pull Request. Dalam beberapa menit, komentar review akan muncul di PR.
+Create a new branch, change any file, and open a Pull Request. Within a few minutes, the review comment will appear on the PR.
 
 ---
 
 ## GitLab CI/CD
 
-### Langkah 1 — Tambah CI/CD Variables
+### Step 1 — Add CI/CD Variables
 
-1. Buka repo di GitLab → **Settings** → **CI/CD** → **Variables**.
-2. Tambah variable:
+1. Open your repo on GitLab → **Settings** → **CI/CD** → **Variables**.
+2. Add variables:
 
 | Key | Value | Protected | Masked |
 |-----|-------|-----------|--------|
-| `REVIUAH_API_KEY` | API key kamu | ✅ | ✅ |
-| `GITLAB_TOKEN` | Personal/project token dengan scope `api` | ✅ | ✅ |
+| `REVIUAH_API_KEY` | Your API key | ✅ | ✅ |
+| `GITLAB_TOKEN` | Personal or project token with `api` scope | ✅ | ✅ |
 
-> **GITLAB_TOKEN** diperlukan untuk post komentar di MR. Buat di **User Settings → Access Tokens** (personal) atau **Project → Settings → Access Tokens** (project).  
-> Scope yang diperlukan: `api`.
+> **GITLAB_TOKEN** is required to post comments on MRs. Create it under **User Settings → Access Tokens** (personal) or **Project → Settings → Access Tokens** (project).  
+> Required scope: `api`.
 
-### Langkah 2 — Buat/Update `.gitlab-ci.yml`
+### Step 2 — Create or Update `.gitlab-ci.yml`
 
-Tambahkan ke `.gitlab-ci.yml` di repo kamu (atau buat baru):
+Add to `.gitlab-ci.yml` in your repo (or create a new file):
 
 ```yaml
 stages:
@@ -197,7 +197,7 @@ code-review:
       fi
 ```
 
-### Langkah 3 — Commit & Push
+### Step 3 — Commit & Push
 
 ```bash
 git add .gitlab-ci.yml
@@ -205,73 +205,73 @@ git commit -m "ci: add ReviuAh auto review on MR"
 git push
 ```
 
-### Langkah 4 — Buat MR untuk Tes
+### Step 4 — Test with an MR
 
-Buat branch baru, ubah file, buat Merge Request. Komentar review akan muncul di MR.
+Create a new branch, make changes, and open a Merge Request. The review comment will appear on the MR.
 
 ---
 
-## Konfigurasi Opsional
+## Optional Configuration
 
-### Ganti Provider
+### Change Provider
 
-Default: `agentrouter`. Ganti dengan menambah env variable:
+Default: `agentrouter`. Override by adding an env variable:
 
 ```yaml
-# Contoh: pakai Gemini
+# Example: use Gemini
 REVIUAH_PROVIDER: gemini
 
-# Contoh: pakai OpenAI
+# Example: use OpenAI
 REVIUAH_PROVIDER: openai
 REVIUAH_MODEL: gpt-4o
 ```
 
-### Batasi Ukuran Diff
+### Limit Diff Size
 
-Untuk repo besar, batasi diff yang dikirim ke LLM:
+For large repos, limit the diff sent to the LLM:
 
 ```yaml
-REVIUAH_MAX_DIFF_SIZE: 60000   # karakter (default 120000)
+REVIUAH_MAX_DIFF_SIZE: 60000   # characters (default 120000)
 ```
 
-### Bahasa Output
+### Output Language
 
 ```yaml
-# Review dalam Bahasa Indonesia
+# Review in Indonesian
 reviuah --range ... --out review.md --lang id
 
-# Review dalam Bahasa Inggris (default)
+# Review in English (default)
 reviuah --range ... --out review.md --lang en
 ```
 
-### Gagalkan PR/MR jika High Risk
+### Fail PR/MR on High Risk
 
-Tambah `--strict` — workflow akan exit code 1 jika risk level = high:
+Add `--strict` — the workflow will exit with code 1 when risk level is high:
 
 ```yaml
 reviuah --range ... --out review.md --strict
 ```
 
-Di GitHub, PR check akan jadi ❌ (gagal). Di GitLab, pipeline akan merah.
+On GitHub, the PR check will fail (❌). On GitLab, the pipeline will fail.
 
 ---
 
 ## Troubleshooting
 
-| Masalah | Solusi |
-|---------|--------|
-| Komentar tidak muncul | Cek secret `REVIUAH_API_KEY` sudah diisi. Cek log workflow/pipeline. |
-| Error 401 dari LLM | API key salah atau expired. Generate ulang. |
-| Error 403 post komentar (GitHub) | Pastikan `permissions: pull-requests: write` ada di workflow. |
-| Error 403 post komentar (GitLab) | `GITLAB_TOKEN` butuh scope `api`. Atau buat project token baru. |
-| Diff terlalu besar | Turunkan `REVIUAH_MAX_DIFF_SIZE` (misal 40000). |
-| Review kosong | Pastikan `fetch-depth: 0` (GitHub) atau `GIT_DEPTH: 0` (GitLab). |
+| Issue | Solution |
+|-------|----------|
+| Comment does not appear | Check that secret `REVIUAH_API_KEY` is set. Check workflow/pipeline logs. |
+| 401 from LLM | API key is wrong or expired. Generate a new one. |
+| 403 when posting comment (GitHub) | Ensure `permissions: pull-requests: write` is in the workflow. |
+| 403 when posting comment (GitLab) | `GITLAB_TOKEN` needs `api` scope. Or create a new project token. |
+| Diff too large | Lower `REVIUAH_MAX_DIFF_SIZE` (e.g. 40000). |
+| Empty review | Ensure `fetch-depth: 0` (GitHub) or `GIT_DEPTH: 0` (GitLab). |
 
 ---
 
-## Ringkasan
+## Summary
 
-| Platform | File yang dibuat | Secrets yang diperlukan |
-|----------|-----------------|------------------------|
+| Platform | File to create | Secrets required |
+|----------|----------------|------------------|
 | GitHub | `.github/workflows/code-review.yml` | `REVIUAH_API_KEY` |
-| GitLab | `.gitlab-ci.yml` (atau include) | `REVIUAH_API_KEY`, `GITLAB_TOKEN` |
+| GitLab | `.gitlab-ci.yml` (or include) | `REVIUAH_API_KEY`, `GITLAB_TOKEN` |

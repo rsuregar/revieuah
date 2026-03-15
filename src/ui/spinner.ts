@@ -4,7 +4,7 @@ const INTERVAL_MS = 400;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 /**
- * Start an animated "Reviewing..." message on stderr. Returns a function to stop and clear.
+ * Start an animated "Generating review..." message on stderr. Returns a function to stop and clear.
  */
 export function startSpinner(message: string): () => void {
   if (!process.stderr.isTTY) {

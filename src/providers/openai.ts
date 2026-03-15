@@ -183,7 +183,7 @@ export class OpenAIProvider implements Provider {
         if (err.name === "AbortError" || err.message?.includes("timeout")) {
           const timeoutMs = getRequestTimeoutMs();
           throw new Error(
-            `Request timeout setelah ${timeoutMs / 1000}s. Set REVIUAH_REQUEST_TIMEOUT_MS untuk mengubah.`,
+            `Request timeout after ${timeoutMs / 1000}s. Set REVIUAH_REQUEST_TIMEOUT_MS to change.`,
           );
         }
         throw err;
@@ -217,7 +217,7 @@ export class OpenAIProvider implements Provider {
   }
 
   private buildPrompt(request: ReviewRequest): string {
-    return [
+    const parts = [
       "Review the following git diff.",
       `Output language: ${request.language}.`,
       "Return Markdown with EXACTLY these sections and order:",
@@ -231,9 +231,12 @@ export class OpenAIProvider implements Provider {
       "## Code Quality & Maintainability",
       "## Actionable Suggestions",
       "Keep the review concise and practical.",
-      "\nGit diff:\n",
-      request.diff,
-    ].join("\n");
+    ];
+    if (request.customPrompt?.trim()) {
+      parts.push("", "Additional instructions from the user:", request.customPrompt.trim());
+    }
+    parts.push("", "Git diff:", "", request.diff);
+    return parts.join("\n");
   }
 }
 

@@ -3,6 +3,8 @@ export type RiskLevel = "low" | "medium" | "high" | "unknown";
 export interface ReviewRequest {
   diff: string;
   language: string;
+  /** Optional custom instructions (e.g. focus areas, style) for the reviewer. */
+  customPrompt?: string;
 }
 
 export interface ReviewResponse {

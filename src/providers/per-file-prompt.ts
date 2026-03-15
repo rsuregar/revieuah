@@ -36,13 +36,15 @@ Rules:
 - Do NOT wrap response in markdown code fences.`;
 
 export function buildPerFilePrompt(request: ReviewRequest): { system: string; user: string } {
-  const user = [
+  const parts = [
     `Output language: ${request.language}.`,
     "Review the following git diff and return per-file inline comments as JSON.",
-    "",
-    "Git diff:",
-    request.diff,
-  ].join("\n");
+  ];
+  if (request.customPrompt?.trim()) {
+    parts.push("", "Additional instructions from the user:", request.customPrompt.trim());
+  }
+  parts.push("", "Git diff:", "", request.diff);
+  const user = parts.join("\n");
 
   return { system: PER_FILE_SYSTEM, user };
 }

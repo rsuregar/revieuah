@@ -13,11 +13,10 @@ AI-powered CLI to review Git diffs before commit or push. Get structured feedbac
 npm install -g reviuah
 ```
 
-Or with yarn / pnpm:
+Or with yarn:
 
 ```bash
 yarn global add reviuah
-pnpm add -g reviuah
 ```
 
 **Requirements:** Node.js 20+, Git. Commands: `reviuah` or `reviewah` (same).
@@ -45,6 +44,9 @@ reviuah --base main
 
 # Save to file
 reviuah --base main --out review.md
+
+# Custom instructions (e.g. focus on security)
+reviuah --base main --prompt "Focus on security and SQL injection risks."
 ```
 
 ---
@@ -59,7 +61,7 @@ reviuah --base main --out review.md
 | Current branch vs base | `reviuah --base main` |
 | Fail CI if high risk | `reviuah --base origin/main --strict` |
 
-**Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high). Run `reviuah --help` for full list.
+**Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high), `--prompt <text>` (custom instructions for the reviewer). Run `reviuah --help` for full list.
 
 After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice (Commitah-style) and suggests updating with `npm install -g reviuah@latest`. (Skipped in CI.)
 
@@ -89,6 +91,7 @@ The CLI prints structured Markdown:
 | `REVIUAH_MODEL` | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000). |
+| `REVIUAH_CUSTOM_PROMPT` | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
 
 Env overrides saved config (useful for CI).
 
@@ -228,5 +231,6 @@ MIT. See [LICENSE](./LICENSE).
 
 - [npm](https://www.npmjs.com/package/reviuah)
 - [GitHub](https://github.com/rsuregar/reviewah)
-- [docs/cara-pakai.md](./docs/cara-pakai.md) (short guide, ID)
-- [docs/panduan-pasang-ci.md](./docs/panduan-pasang-ci.md) — panduan lengkap pasang di repo GitHub / GitLab
+- [docs/commands-and-env-guide.md](./docs/commands-and-env-guide.md) — Full guide: all CLI commands and environment variables
+- [docs/usage-guide.md](./docs/usage-guide.md) — Short usage guide
+- [docs/ci-setup-guide.md](./docs/ci-setup-guide.md) — CI setup for GitHub / GitLab
