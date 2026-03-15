@@ -6,6 +6,8 @@ import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
 import type { ReviewResponse } from "../providers/index.js";
 import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
+import { printBanner } from "../ui/logo.js";
+import { startSpinner } from "../ui/spinner.js";
 
 const DEFAULT_MAX_DIFF_SIZE = 120000;
 
@@ -73,10 +75,17 @@ export async function reviewCommand(
   const credentials = await resolveReviewCredentials();
   const provider = createProvider(credentials);
 
-  const result = await provider.review({
-    diff: trimmedDiff,
-    language: options.lang,
-  });
+  printBanner();
+  const stopSpinner = startSpinner("Reviewing");
+  let result: ReviewResponse;
+  try {
+    result = await provider.review({
+      diff: trimmedDiff,
+      language: options.lang,
+    });
+  } finally {
+    stopSpinner();
+  }
 
   await outputReview(result.markdown, options.out);
 

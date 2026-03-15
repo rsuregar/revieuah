@@ -7,12 +7,7 @@ import { dirname, join } from "node:path";
 import { reviewCommand } from "./commands/review.js";
 import { setupCommand } from "./commands/setup.js";
 import { configStatusCommand } from "./commands/config-status.js";
-import {
-  getUpdateInfo,
-  printUpdateMessage,
-  promptUpdateNow,
-  runUpdate,
-} from "./lib/check-update.js";
+import { checkForUpdates } from "./lib/check-update.js";
 
 function readPkgVersion(): string {
   try {
@@ -84,13 +79,7 @@ program
         process.exitCode = 1;
       }
 
-      const currentVersion = readPkgVersion();
-      const updateInfo = await getUpdateInfo(currentVersion);
-      if (updateInfo) {
-        printUpdateMessage(updateInfo);
-        const doUpdate = await promptUpdateNow();
-        if (doUpdate) await runUpdate();
-      }
+      await checkForUpdates();
     },
   );
 

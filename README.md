@@ -61,7 +61,7 @@ reviuah --base main --out review.md
 
 **Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high). Run `reviuah --help` for full list.
 
-After a review run, if a newer version is available on npm, ReviuAh prints a short notice and asks **Update now? [y/N]**. Answer `y` to run `npm install -g reviuah`; otherwise you can update later. (Skipped in CI.)
+After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice (Commitah-style) and suggests updating with `npm install -g reviuah@latest`. (Skipped in CI.)
 
 ---
 

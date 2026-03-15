@@ -1,82 +1,75 @@
-const NPM_REGISTRY = "https://registry.npmjs.org";
-const PACKAGE_NAME = "reviuah";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-/** Simple semver-like compare: returns true if a < b (a is older). */
-function isOlder(a: string, b: string): boolean {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const va = pa[i] ?? 0;
-    const vb = pb[i] ?? 0;
-    if (va < vb) return true;
-    if (va > vb) return false;
+const PACKAGE_NAME = "reviuah";
+const require = createRequire(import.meta.url);
+
+const YELLOW = "\x1b[33m";
+const BOLD = "\x1b[1m";
+const GRAY = "\x1b[90m";
+const RESET = "\x1b[0m";
+
+interface NpmRegistryResponse {
+  "dist-tags"?: {
+    latest?: string;
+  };
+}
+
+function getCurrentVersion(): string {
+  try {
+    const scriptDir = dirname(fileURLToPath(import.meta.url));
+    const root = join(scriptDir, "..", "..");
+    const pkg = require(join(root, "package.json")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+function isNewVersionAvailable(
+  currentVersion: string,
+  latestVersion: string,
+): boolean {
+  const currentParts = currentVersion.split(".").map(Number);
+  const latestParts = latestVersion.split(".").map(Number);
+
+  for (let i = 0; i < latestParts.length; i++) {
+    if (latestParts[i]! > (currentParts[i] ?? 0)) return true;
+    if (latestParts[i]! < (currentParts[i] ?? 0)) return false;
   }
   return false;
 }
 
-export interface UpdateInfo {
-  current: string;
-  latest: string;
-}
-
 /**
- * Fetches latest version from npm registry. Returns null on error or when not needed.
+ * Check npm registry for newer version and print a one-line notice (Commitah-style).
+ * Silently fails so it never blocks the tool.
  */
-export async function getUpdateInfo(
-  currentVersion: string,
-): Promise<UpdateInfo | null> {
+export async function checkForUpdates(): Promise<void> {
   if (process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true") {
-    return null;
+    return;
   }
   try {
-    const res = await fetch(`${NPM_REGISTRY}/${PACKAGE_NAME}/latest`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { version?: string };
-    const latest = data.version?.trim();
-    if (!latest || !isOlder(currentVersion, latest)) return null;
-    return { current: currentVersion, latest };
+    const currentVersion = getCurrentVersion();
+    const response = await fetch(
+      `https://registry.npmjs.org/${PACKAGE_NAME}`,
+      { signal: AbortSignal.timeout(3000) },
+    );
+    if (!response.ok) return;
+
+    const data = (await response.json()) as NpmRegistryResponse;
+    const latestVersion = data["dist-tags"]?.latest?.trim();
+    if (!latestVersion) return;
+
+    if (isNewVersionAvailable(currentVersion, latestVersion)) {
+      console.log(
+        `${YELLOW}\nNew version available: ${BOLD}${latestVersion}${RESET}${YELLOW} (current: ${currentVersion})${RESET}`,
+      );
+      console.log(
+        `${GRAY}Update manually with: npm install -g ${PACKAGE_NAME}@latest\n${RESET}`,
+      );
+    }
   } catch {
-    return null;
-  }
-}
-
-export function printUpdateMessage(info: UpdateInfo): void {
-  console.error(
-    `\nreviuah: A new version (${info.latest}) is available. You have ${info.current}.`,
-  );
-  console.error("Run: npm install -g reviuah");
-}
-
-/**
- * Ask user if they want to update now (TTY only). Returns true if they said yes.
- */
-export async function promptUpdateNow(): Promise<boolean> {
-  if (!process.stdin.isTTY) return false;
-  const readline = await import("node:readline/promises");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stderr,
-  });
-  try {
-    const answer = (await rl.question("Update now? [y/N]: ")).trim().toLowerCase();
-    return answer === "y" || answer === "yes";
-  } finally {
-    rl.close();
-  }
-}
-
-/**
- * Run npm install -g reviuah. Preserves exit code.
- */
-export async function runUpdate(): Promise<void> {
-  const { execa } = await import("execa");
-  try {
-    await execa("npm", ["install", "-g", PACKAGE_NAME], {
-      stdio: "inherit",
-    });
-  } catch {
-    process.exitCode = process.exitCode || 1;
+    // Silently fail - don't block the tool for update issues
   }
 }
