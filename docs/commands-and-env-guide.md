@@ -71,7 +71,41 @@ reviuah --range origin/main...HEAD --no-summary --out review.md
 reviuah --base origin/main --strict --out review.md
 ```
 
-**Custom prompt from file:** Place a file named `reviuah-prompt.md` in your **git repository root**. If you don’t pass `--prompt` and don’t set `REVIUAH_CUSTOM_PROMPT`, ReviuAh will use that file’s contents as the custom prompt. Use Markdown for structure (headings, lists). Commit the file to share review rules with your team.
+**Custom prompt from file:** Place a file named `reviuah-prompt.md` in the **git repository root of the project you are reviewing**. If you don’t pass `--prompt` and don’t set `REVIUAH_CUSTOM_PROMPT`, ReviuAh will use that file’s contents as the custom prompt. Use Markdown for structure (headings, lists). Commit the file to share review rules with your team. This file is read from the repo where you run `reviuah`, not from the ReviuAh tool repository.
+
+**Example `reviuah-prompt.md`:**
+
+```md
+# Review role
+Act as a senior frontend engineer specializing in React and Next.js.
+
+# Review principles
+Apply these principles when reviewing:
+- SOLID
+- KISS
+- DRY
+- Clean Code
+
+# Review scope
+Focus on:
+- component design and responsibilities
+- state management and data flow
+- hooks usage and side effects
+- server/client boundaries in Next.js
+- rendering performance
+- accessibility
+- readability and maintainability
+
+# Severity threshold
+Only report findings when severity is medium, high, or critical.
+Ignore low-severity suggestions and minor style nits.
+
+# Review style
+- Be concise and specific.
+- Prefer actionable findings.
+- Do not comment unless there is a meaningful issue or risk.
+- When possible, explain the impact and the recommended fix briefly.
+```
 
 ---
 
@@ -156,7 +190,7 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_MAX_OUTPUT_TOKENS` | No | provider default | Cap completion length (for example `1500`) to reduce output tokens |
 | `REVIUAH_DIFF_EXCLUDE_PATTERNS` | No | — | Extra comma-separated regex patterns for diff paths to exclude before sending to the LLM (for example `(^|/)fixtures/,\\.snap$`) |
 | `REVIUAH_LOG_TOKEN_BUDGET` | No | disabled | Set `1` / `true` to print an estimated input token budget summary after diff preparation |
-| `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. |
+| `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. See the sample prompt example above for a reusable team template. |
 
 ### Example usage with env
 
@@ -244,7 +278,7 @@ Response is JSON with `choices[0].message.content`. Use the same `Authorization:
 **Custom prompt:**  
 1. CLI `--prompt "..."`  
 2. Env `REVIUAH_CUSTOM_PROMPT`  
-3. File `reviuah-prompt.md` in git repo root (if present)
+3. File `reviuah-prompt.md` in the target git repo root where you run `reviuah` (if present)
 
 ---
 
