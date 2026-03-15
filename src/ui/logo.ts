@@ -1,12 +1,13 @@
-/** ANSI: magenta/pink (similar to Commitah style) */
 const PINK = "\x1b[35m";
 const RESET = "\x1b[0m";
 
-/** ASCII banner: clearly reads "REVIUAH" (no block letters to avoid misread). */
 const BANNER = `
-${PINK}  +-------------+
-  |  REVIUAH   |
-  +-------------+${RESET}
+${PINK}  _____            _                  _     _
+ |  __ \\          (_)           /\\   | |   | |
+ | |__) |_____   ___ _   _     /  \\  | |__ | |
+ |  _  // _ \\ \\ / / | | | |   / /\\ \\ | '_ \\| |
+ | | \\ \\  __/\\ V /| | |_| |  / ____ \\| | | |_|
+ |_|  \\_\\___| \\_/ |_|\\__,_| /_/    \\_\\_| |_(_)${RESET}
 `;
 
 export function printBanner(): void {

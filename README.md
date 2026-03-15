@@ -20,7 +20,7 @@ yarn global add reviuah
 pnpm add -g reviuah
 ```
 
-**Requirements:** Node.js 18+, Git. Commands: `reviuah` or `reviewah` (same).
+**Requirements:** Node.js 20+, Git. Commands: `reviuah` or `reviewah` (same).
 
 ---
 
@@ -32,10 +32,7 @@ pnpm add -g reviuah
 reviuah setup
 ```
 
-Interactive setup menyimpan ke `~/.reviuah/config.json`.  
-- **Default:** wizard (form TUI) bila terminal interaktif; bila gagal, otomatis pakai prompt sederhana.  
-- `reviuah setup --no-wizard` = langsung prompt sederhana (untuk automation/script).  
-- **Ubah config:** `reviuah config --update` atau `reviuah setup`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
+Interactive setup saves config to `~/.reviuah/config.json`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
 
 **2. Run a review:**
 
@@ -62,11 +59,9 @@ reviuah --base main --out review.md
 | Current branch vs base | `reviuah --base main` |
 | Fail CI if high risk | `reviuah --base origin/main --strict` |
 
-**Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high).
+**Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high). Run `reviuah --help` for full list.
 
-**Commands:** `setup` (config wizard), `config` / `config --update` (lihat/ubah config), `version patch|minor|major` (bump versi untuk release), `update` (dependensi + build, untuk development). Run `reviuah --help` for full list.
-
-After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice and suggests updating with `npm install -g reviuah@latest` or `yarn global add reviuah@latest`. (Skipped in CI.)
+After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice (Commitah-style) and suggests updating with `npm install -g reviuah@latest`. (Skipped in CI.)
 
 ---
 
@@ -93,35 +88,106 @@ The CLI prints structured Markdown:
 | `REVIUAH_PROVIDER_URL` | Override API base URL |
 | `REVIUAH_MODEL` | Override model name |
 | `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
-| `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in ms (default 60000). |
+| `REVIUAH_REQUEST_TIMEOUT_MS` | Timeout for LLM API requests in milliseconds (default 60000). |
 
 Env overrides saved config (useful for CI).
 
 ---
 
-## CI (GitHub Actions)
+## CI — Auto Review & Comment on PR / MR
 
-Use `fetch-depth: 0` so the base branch is available for `git diff base...HEAD`.
+ReviuAh can automatically review every pull request (GitHub) or merge request (GitLab), then **post the review as a comment** on the PR/MR. When the PR is updated, the comment is updated (not duplicated).
+
+### GitHub Actions
+
+1. Add secret `REVIUAH_API_KEY` in repo Settings → Secrets.
+2. Copy `.github/workflows/code-review.yml` (included in this repo) or use the snippet below.
+3. Every PR will get a comment with the AI review.
 
 ```yaml
 name: AI Review
-on: [pull_request]
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write          # needed to post comments
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0            # full history for diff
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm install -g reviuah
-      - run: reviuah --range origin/${{ github.base_ref }}...HEAD --strict
+      - run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --out review.md
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
+      - name: Comment on PR
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('review.md', 'utf8').trim();
+            if (!body) return;
+            const marker = '<!-- reviuah-review -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            const content = `${marker}\n# 🔍 ReviuAh — AI Code Review\n\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body: content,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body: content,
+              });
+            }
 ```
+
+### GitLab CI
+
+1. Add CI/CD variables: `REVIUAH_API_KEY` and `GITLAB_TOKEN` (personal/project token with `api` scope).
+2. Copy `.gitlab-ci-review.yml` to your repo as `.gitlab-ci.yml` (or `include` it).
+3. Every MR will get a note with the AI review.
+
+```yaml
+code-review:
+  stage: review
+  image: node:20
+  only:
+    - merge_requests
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - npm install -g reviuah
+    - reviuah --range origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD --out review.md || true
+    - |
+      # Post/update comment on MR via GitLab API
+      API_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes"
+      TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+      BODY="<!-- reviuah-review -->\n# 🔍 ReviuAh — AI Code Review\n\n$(cat review.md)"
+      curl -sf --request POST --header "PRIVATE-TOKEN: $TOKEN" \
+        --data-urlencode "body=$BODY" "$API_URL" > /dev/null
+```
+
+> **Tip:** Add `--strict` to fail the workflow when risk level is high (block merge).
+
+---
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, guidelines, and how to submit a PR.
 
 ---
 
@@ -140,7 +206,9 @@ yarn build
 yarn link
 ```
 
-Then run `reviuah` from any repo. Publish: set `NPM_TOKEN` in repo Secrets and merge to `main`, or run the **Publish to npm** workflow manually (Actions tab).
+Then run `reviuah` from any repo. See [CONTRIBUTING.md](./CONTRIBUTING.md) for full development workflow.
+
+Publish: set `NPM_TOKEN` in repo Secrets and merge to `main`, or run the **Publish to npm** workflow manually (Actions tab).
 
 **Install from source (no npm publish):**
 
@@ -161,3 +229,4 @@ MIT. See [LICENSE](./LICENSE).
 - [npm](https://www.npmjs.com/package/reviuah)
 - [GitHub](https://github.com/rsuregar/reviewah)
 - [docs/cara-pakai.md](./docs/cara-pakai.md) (short guide, ID)
+- [docs/panduan-pasang-ci.md](./docs/panduan-pasang-ci.md) — panduan lengkap pasang di repo GitHub / GitLab

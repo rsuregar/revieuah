@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -20,16 +21,134 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
 
-      - name: Install ReviuAh
-        run: npm install -g reviuah
+      - name: Enable Corepack
+        run: corepack enable
 
-      - name: Run ReviuAh (code review from diff)
-        run: reviuah --range origin/${{ github.base_ref }}...HEAD --strict
+      - name: Install dependencies & build from source
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
+      # Skip review steps for fork PRs (no access to secrets)
+      - name: Run overall review
+        if: env.REVIUAH_API_KEY != ''
+        run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
-          # Native Gemini (untuk hemat token bisa pakai model lebih kecil atau turunkan max diff)
-          REVIUAH_PROVIDER_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent
-          # Batas karakter diff yang dikirim (default 120000). Lebih kecil = lebih hemat token.
+          REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
           REVIUAH_MAX_DIFF_SIZE: 60000
+
+      - name: Run per-file review
+        if: env.REVIUAH_API_KEY != ''
+        run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
+        env:
+          REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
+          REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
+          REVIUAH_MAX_DIFF_SIZE: 60000
+
+      # 3. Post overall summary as PR comment (create or update)
+      - name: Post summary comment
+        if: success() && hashFiles('review.md') != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('review.md', 'utf8').trim();
+            if (!body) return;
+
+            const marker = '<!-- reviuah-review -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            const content = `${marker}\n# 🔍 ReviuAh — AI Code Review\n\n${body}`;
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: content,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: content,
+              });
+            }
+
+      # 4. Post per-file inline comments as a PR review
+      - name: Post inline review comments
+        if: success() && hashFiles('review.json') != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('review.json', 'utf8').trim();
+            if (!raw) return;
+
+            let data;
+            try { data = JSON.parse(raw); } catch { return; }
+
+            // Only post inline comments when risk is medium or higher
+            const risk = (data.risk || 'unknown').toLowerCase();
+            if (risk !== 'medium' && risk !== 'high') {
+              console.log(`Risk level is "${risk}" — skipping inline comments.`);
+              return;
+            }
+            if (!data.comments || data.comments.length === 0) return;
+
+            // Dismiss previous ReviuAh reviews to avoid duplicates
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            for (const r of reviews) {
+              if (r.body?.includes('<!-- reviuah-inline -->') && r.state === 'COMMENTED') {
+                try {
+                  await github.rest.pulls.dismissReview({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    review_id: r.id,
+                    message: 'Superseded by new ReviuAh review.',
+                  });
+                } catch { /* dismiss may fail if not approved/changes_requested */ }
+              }
+            }
+
+            // Map severity to emoji
+            const emoji = { critical: '🔴', warning: '🟡', suggestion: '💡', praise: '✅' };
+
+            // Build review comments array
+            const prComments = data.comments
+              .filter(c => c.path && c.line > 0 && c.body)
+              .map(c => ({
+                path: c.path,
+                line: c.line,
+                side: 'RIGHT',
+                body: `${emoji[c.severity] || '💡'} **${c.severity}**: ${c.body}`,
+              }));
+
+            if (prComments.length === 0) return;
+
+            const summaryLine = `<!-- reviuah-inline -->\n🔍 **ReviuAh per-file review** — ${prComments.length} comment(s), risk: **${data.risk || 'unknown'}**`;
+
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              commit_id: context.payload.pull_request.head.sha,
+              body: summaryLine,
+              event: 'COMMENT',
+              comments: prComments,
+            });

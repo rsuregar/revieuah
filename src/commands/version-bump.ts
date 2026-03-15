@@ -1,19 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import semver from "semver";
+import { getPackageRoot } from "../lib/package-root.js";
 
 type BumpType = "patch" | "minor" | "major";
 
-function getPackageRoot(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return join(here, "..");
-}
-
 export async function versionBumpCommand(type: BumpType): Promise<void> {
-  const root = getPackageRoot();
-  const pkgPath = join(root, "package.json");
-
+  const pkgPath = join(getPackageRoot(), "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: string };
   const current = (pkg.version ?? "0.0.0").replace(/^v/, "");
 
@@ -28,6 +21,5 @@ export async function versionBumpCommand(type: BumpType): Promise<void> {
 
   pkg.version = next;
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
-
   console.log(`${current} → ${next} (${type})`);
 }

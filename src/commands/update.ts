@@ -1,23 +1,14 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
-/**
- * Root of the reviuah package (where dist/ and package.json live).
- * When run as global CLI this is e.g. .../node_modules/reviuah; when run from repo it's the repo root.
- */
-function getPackageRoot(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return join(here, "..");
-}
+import { join } from "node:path";
+import { getPackageRoot } from "../lib/package-root.js";
 
 export async function updateCommand(): Promise<void> {
   const root = getPackageRoot();
   const pkgPath = join(root, "package.json");
 
   if (!existsSync(pkgPath)) {
-    console.error("Tidak menemukan package.json. Jalankan dari folder project reviuah.");
+    console.error("package.json not found. Run from the reviuah project.");
     return;
   }
 
@@ -25,40 +16,33 @@ export async function updateCommand(): Promise<void> {
   try {
     pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   } catch {
-    console.error("Gagal baca package.json.");
+    console.error("Failed to read package.json.");
     return;
   }
 
   if (pkg.name !== "reviuah" || !pkg.scripts?.build) {
-    console.error("Ini bukan project reviuah atau tidak ada script build.");
+    console.error("Not a reviuah project or missing build script.");
     return;
   }
 
   const useYarn = existsSync(join(root, "yarn.lock"));
+  const run = (cmd: string) => execSync(cmd, { cwd: root, stdio: "inherit" });
 
-  console.error("Memperbarui dependensi...");
+  console.error("Installing dependencies...");
   try {
-    if (useYarn) {
-      execSync("yarn install", { cwd: root, stdio: "inherit" });
-    } else {
-      execSync("npm install", { cwd: root, stdio: "inherit" });
-    }
-  } catch (err) {
-    console.error("Gagal install:", err);
+    run(useYarn ? "yarn install" : "npm install");
+  } catch {
+    console.error("Install failed.");
     return;
   }
 
-  console.error("Build ulang...");
+  console.error("Building...");
   try {
-    if (useYarn) {
-      execSync("yarn build", { cwd: root, stdio: "inherit" });
-    } else {
-      execSync("npm run build", { cwd: root, stdio: "inherit" });
-    }
-  } catch (err) {
-    console.error("Gagal build:", err);
+    run(useYarn ? "yarn build" : "npm run build");
+  } catch {
+    console.error("Build failed.");
     return;
   }
 
-  console.error("Selesai: dependensi diperbarui dan build berhasil.");
+  console.error("Done: dependencies updated and build succeeded.");
 }

@@ -1,10 +1,22 @@
 import OpenAI from "openai";
 import type {
+  PerFileReviewResponse,
   Provider,
   ReviewRequest,
   ReviewResponse,
   RiskLevel,
 } from "./index.js";
+import { buildPerFilePrompt, parsePerFileResponse } from "./per-file-prompt.js";
+
+function messageForStatus(status: number): string {
+  switch (status) {
+    case 401: return "Authentication failed (401). Check your API key.";
+    case 403: return "Forbidden (403). API key does not have access.";
+    case 404: return "Not found (404). Check model name or endpoint URL.";
+    case 429: return "Rate limit exceeded (429). Try again later.";
+    default: return `Request failed (${status}).`;
+  }
+}
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 
@@ -15,27 +27,6 @@ function getRequestTimeoutMs(): number {
     if (Number.isFinite(n) && n > 0) return n;
   }
   return DEFAULT_REQUEST_TIMEOUT_MS;
-}
-
-function messageForStatus(status: number): string {
-  switch (status) {
-    case 400:
-      return "Bad request (400). Periksa model/parameter.";
-    case 401:
-      return "Authentication failed (401). Periksa API key.";
-    case 403:
-      return "Forbidden (403). API key tidak punya akses.";
-    case 404:
-      return "Not found (404). Model atau endpoint salah.";
-    case 429:
-      return "Rate limit (429). Coba lagi nanti.";
-    case 500:
-    case 502:
-    case 503:
-      return `Server error (${status}). Coba lagi nanti.`;
-    default:
-      return `Request failed (${status}).`;
-  }
 }
 
 export interface OpenAIProviderOptions {
@@ -55,7 +46,6 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     baseURL: "https://api.anthropic.com/v1",
     defaultModel: "claude-sonnet-4-5",
   },
-  /** OpenAI-compatible; native API is .../v1beta/models/gemini-flash-latest:generateContent */
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     defaultModel: "gemini-flash-latest",
@@ -197,6 +187,30 @@ export class OpenAIProvider implements Provider {
           );
         }
         throw err;
+      }
+      throw err;
+    }
+  }
+
+  async reviewPerFile(request: ReviewRequest): Promise<PerFileReviewResponse> {
+    const { system, user } = buildPerFilePrompt(request);
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      });
+
+      const raw = response.choices[0]?.message?.content?.trim() ?? "{}";
+      return parsePerFileResponse(raw);
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (typeof status === "number") {
+        throw new Error(messageForStatus(status));
       }
       throw err;
     }

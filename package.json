@@ -1,12 +1,16 @@
 {
   "name": "reviuah",
-  "version": "1.0.5",
+  "version": "0.1.1",
   "description": "AI-powered Git diff reviewer CLI — staged, branch vs base, CI-friendly",
   "license": "MIT",
   "author": "rsuregar",
   "repository": {
     "type": "git",
     "url": "https://github.com/rsuregar/reviewah.git"
+  },
+  "homepage": "https://github.com/rsuregar/reviewah#readme",
+  "bugs": {
+    "url": "https://github.com/rsuregar/reviewah/issues"
   },
   "keywords": [
     "cli",
@@ -36,8 +40,7 @@
     "version:patch": "node scripts/bump-version.mjs patch",
     "version:minor": "node scripts/bump-version.mjs minor",
     "version:major": "node scripts/bump-version.mjs major",
-    "prepublishOnly": "npm run build",
-    "prepare": "node scripts/prepare.mjs"
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "node": ">=20"
@@ -52,7 +55,7 @@
   "devDependencies": {
     "@types/blessed": "^0.1.27",
     "@types/node": "^25.3.3",
-    "@types/semver": "^6.0.0",
+    "@types/semver": "^7.5.0",
     "typescript": "^5.6.3"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
