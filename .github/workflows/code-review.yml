@@ -18,24 +18,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Node 22 LTS: stable, matches package.json engines
+      # Node 22 LTS
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies & build from source
-        run: |
-          yarn install --frozen-lockfile
-          yarn build
+      - name: Install ReviuAh
+        run: npm install -g reviuah@latest
 
       # Skip review steps for fork PRs (no access to secrets)
       - name: Run overall review
         if: env.REVIUAH_API_KEY != ''
-        run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
+        run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
@@ -44,7 +39,7 @@ jobs:
 
       - name: Run per-file review
         if: env.REVIUAH_API_KEY != ''
-        run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
+        run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
