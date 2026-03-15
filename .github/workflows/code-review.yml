@@ -39,7 +39,7 @@ jobs:
           REVIUAH_MAX_DIFF_SIZE: 60000
 
       - name: Run per-file review
-        if: secrets.REVIUAH_API_KEY != ''
+        if: env.REVIUAH_API_KEY != ''
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
         env:
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
