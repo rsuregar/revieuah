@@ -110,7 +110,7 @@ ReviuAh can automatically review every pull request (GitHub) or merge request (G
 ### GitHub Actions
 
 1. Add secret `REVIUAH_API_KEY` in repo Settings → Secrets.
-2. Copy `.github/workflows/code-review.yml` (included in this repo) or use the snippet below.
+2. Copy `.github/workflows/code-review.yml` (included in this repo) into your repo — it installs ReviuAh from npm and runs it (no build from source; works in any repo). Or use the snippet below.
 3. Every PR will get a comment with the AI review.
 
 ```yaml
@@ -132,7 +132,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install -g reviuah
+      - run: npm install -g reviuah@latest
       - run: reviuah --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --out review.md
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
@@ -167,19 +167,19 @@ jobs:
 ### GitLab CI
 
 1. Add CI/CD variables: `REVIUAH_API_KEY` and `GITLAB_TOKEN` (personal/project token with `api` scope).
-2. Copy `.gitlab-ci-review.yml` to your repo as `.gitlab-ci.yml` (or `include` it).
+2. Copy `.gitlab-ci-review.yml` to your repo as `.gitlab-ci.yml` (or `include` it). It installs ReviuAh from npm (works in any repo).
 3. Every MR will get a note with the AI review.
 
 ```yaml
 code-review:
   stage: review
-  image: node:20
+  image: node:22
   only:
     - merge_requests
   variables:
     GIT_DEPTH: 0
   script:
-    - npm install -g reviuah
+    - npm install -g reviuah@latest
     - reviuah --range origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD --out review.md || true
     - |
       # Post/update comment on MR via GitLab API

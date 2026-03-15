@@ -36,7 +36,9 @@ ReviuAh can be added to any repository (GitHub or GitLab) to **automatically rev
 
 ### Step 2 — Create Workflow File
 
-Create `.github/workflows/code-review.yml` in your repo with:
+The workflow installs ReviuAh from npm (`npm install -g reviuah@latest`) and runs the `reviuah` command — **no build from source**, so it works when copied to any repo. For the full workflow (summary + per-file review + comment posting), copy [`.github/workflows/code-review.yml`](https://github.com/rsuregar/reviewah/blob/main/.github/workflows/code-review.yml) from the ReviuAh repo.
+
+Minimal example (summary only):
 
 ```yaml
 name: AI Code Review
@@ -58,9 +60,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
-      - run: npm install -g reviuah
+      - run: npm install -g reviuah@latest
 
       - name: Run review
         run: reviuah --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
@@ -139,7 +141,9 @@ Create a new branch, change any file, and open a Pull Request. Within a few minu
 
 ### Step 2 — Create or Update `.gitlab-ci.yml`
 
-Add to `.gitlab-ci.yml` in your repo (or create a new file):
+The workflow installs ReviuAh from npm (`npm install -g reviuah@latest`) and runs `reviuah` — **no build from source**, so it works in any repo. For the full template (summary + per-file + MR notes), copy [`.gitlab-ci-review.yml`](https://github.com/rsuregar/reviewah/blob/main/.gitlab-ci-review.yml) from the ReviuAh repo as `.gitlab-ci.yml`.
+
+Minimal example:
 
 ```yaml
 stages:
@@ -147,13 +151,13 @@ stages:
 
 code-review:
   stage: review
-  image: node:20
+  image: node:22
   only:
     - merge_requests
   variables:
     GIT_DEPTH: 0
   script:
-    - npm install -g reviuah
+    - npm install -g reviuah@latest
 
     - >
       reviuah

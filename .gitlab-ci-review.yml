@@ -1,5 +1,6 @@
 # ReviuAh GitLab CI — auto review + comment on MR
 # Copy to your repo as .gitlab-ci.yml (or include it).
+# Uses published ReviuAh from npm (npm install -g reviuah@latest); works in any repo.
 #
 # You use YOUR OWN API key. Add it in your project's CI/CD variables (below).
 # Required CI/CD variables (Settings > CI/CD > Variables):
