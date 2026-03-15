@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: "Version bump type (untuk manual publish)"
+        description: "Version bump type (for manual publish)"
         required: true
         type: choice
         options:
@@ -14,20 +14,19 @@ on:
           - minor
           - major
 
-# Jangan jalankan lagi setelah push hasil version bump (hindari loop)
 permissions:
   contents: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Saat push ke main: jalankan hanya jika commit BUKAN hasil version bump
+    # On push to main: run only if commit is NOT a version-bump (avoid loop)
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
     env:
       VERSION_BUMP: ${{ github.event.inputs.version_type || 'patch' }}
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
