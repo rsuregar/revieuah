@@ -1,6 +1,6 @@
 {
   "name": "reviuah",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-powered Git diff reviewer CLI — staged, branch vs base, CI-friendly",
   "license": "MIT",
   "author": "rsuregar",
