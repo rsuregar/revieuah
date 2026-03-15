@@ -8,6 +8,10 @@
     "type": "git",
     "url": "https://github.com/rsuregar/reviewah.git"
   },
+  "homepage": "https://github.com/rsuregar/reviewah#readme",
+  "bugs": {
+    "url": "https://github.com/rsuregar/reviewah/issues"
+  },
   "keywords": [
     "cli",
     "git",

@@ -31,16 +31,17 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
 
-      # 1. Overall summary review (posted as PR comment)
+      # Skip review steps for fork PRs (no access to secrets)
       - name: Run overall review
+        if: env.REVIUAH_API_KEY != ''
         run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --out review.md --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
           REVIUAH_PROVIDER: ${{ vars.REVIUAH_PROVIDER || 'gemini' }}
           REVIUAH_MAX_DIFF_SIZE: 60000
 
-      # 2. Per-file inline review (posted as PR review with inline comments)
       - name: Run per-file review
+        if: env.REVIUAH_API_KEY != ''
         run: node dist/cli.js --range origin/${{ github.base_ref }}...HEAD --per-file --out review.json --lang en
         env:
           REVIUAH_API_KEY: ${{ secrets.REVIUAH_API_KEY }}
@@ -96,6 +97,13 @@ jobs:
 
             let data;
             try { data = JSON.parse(raw); } catch { return; }
+
+            // Only post inline comments when risk is medium or higher
+            const risk = (data.risk || 'unknown').toLowerCase();
+            if (risk !== 'medium' && risk !== 'high') {
+              console.log(`Risk level is "${risk}" — skipping inline comments.`);
+              return;
+            }
             if (!data.comments || data.comments.length === 0) return;
 
             // Dismiss previous ReviuAh reviews to avoid duplicates

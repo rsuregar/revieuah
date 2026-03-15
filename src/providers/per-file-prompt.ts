@@ -8,7 +8,7 @@ You MUST respond with ONLY a valid JSON object, no markdown fences, no extra tex
 JSON schema:
 {
   "summary": "One-paragraph overall summary of the changes.",
-  "risk": "low | medium | high | unknown",
+  "risk": "low | medium | high",
   "comments": [
     {
       "path": "relative/file/path.ts",
@@ -19,12 +19,19 @@ JSON schema:
   ]
 }
 
+Severity definitions:
+- "critical": Bugs, security vulnerabilities, data loss, breaking changes. MUST be fixed.
+- "warning": Potential issues, performance concerns, bad practices. Should be fixed.
+- "suggestion": Minor improvements, readability, style. Nice to have.
+- "praise": Well-written code. Only include if truly outstanding.
+
 Rules:
 - "path" must match the file path from the diff header (e.g. b/src/foo.ts → src/foo.ts).
 - "line" is the line number in the NEW version of the file (right side of diff). Use 0 for file-level comments.
 - Only comment on lines that actually appear in the diff (added or modified).
-- Focus on issues: bugs, security, performance, readability. Skip trivial formatting.
-- Include at least one "praise" if something is well done.
+- Focus on real issues: bugs, security, performance, logic errors. Skip trivial formatting.
+- Only include comments with severity "critical" or "warning". Skip "suggestion" and "praise" unless the change is truly noteworthy.
+- If risk is "low" and there are no critical/warning issues, return an empty comments array.
 - Keep each "body" concise (1-3 sentences).
 - Do NOT wrap response in markdown code fences.`;
 
@@ -74,6 +81,8 @@ export function parsePerFileResponse(raw: string): PerFileReviewResponse {
     ? (parsed.risk!.toLowerCase() as RiskLevel)
     : "unknown";
 
+  const actionableSeverities = new Set<string>(["critical", "warning"]);
+
   const comments: FileComment[] = (parsed.comments ?? [])
     .filter((c) => c.path && typeof c.body === "string" && c.body.trim())
     .map((c) => ({
@@ -82,8 +91,9 @@ export function parsePerFileResponse(raw: string): PerFileReviewResponse {
       body: c.body!.trim(),
       severity: validSeverities.has(c.severity?.toLowerCase() ?? "")
         ? (c.severity!.toLowerCase() as FileComment["severity"])
-        : "suggestion",
-    }));
+        : "warning",
+    }))
+    .filter((c) => actionableSeverities.has(c.severity));
 
   return {
     summary: parsed.summary?.trim() ?? "No summary provided.",

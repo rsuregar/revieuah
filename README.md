@@ -181,7 +181,13 @@ code-review:
         --data-urlencode "body=$BODY" "$API_URL" > /dev/null
 ```
 
-> **Tip:** Bisa tambahkan `--strict` agar workflow exit 1 jika risk level high (gagalkan merge).
+> **Tip:** Add `--strict` to fail the workflow when risk level is high (block merge).
+
+---
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, guidelines, and how to submit a PR.
 
 ---
 
@@ -200,7 +206,9 @@ yarn build
 yarn link
 ```
 
-Then run `reviuah` from any repo. Publish: set `NPM_TOKEN` in repo Secrets and merge to `main`, or run the **Publish to npm** workflow manually (Actions tab).
+Then run `reviuah` from any repo. See [CONTRIBUTING.md](./CONTRIBUTING.md) for full development workflow.
+
+Publish: set `NPM_TOKEN` in repo Secrets and merge to `main`, or run the **Publish to npm** workflow manually (Actions tab).
 
 **Install from source (no npm publish):**
 
