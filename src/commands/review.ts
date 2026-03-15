@@ -1,8 +1,8 @@
-import { writeFile, access, mkdir, stat } from "node:fs/promises";
+import { writeFile, access, mkdir, stat, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execa } from "execa";
-import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
+import { getCommitDiff, getRangeDiff, getRepoRoot, getStagedDiff } from "../git/diff.js";
 import type { PerFileReviewResponse, ReviewResponse } from "../providers/index.js";
 import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
@@ -79,10 +79,7 @@ export async function reviewCommand(
   const credentials = await resolveReviewCredentials();
   const provider = createProvider(credentials);
 
-  const customPrompt =
-    options.customPrompt?.trim() ||
-    process.env.REVIUAH_CUSTOM_PROMPT?.trim() ||
-    undefined;
+  const customPrompt = await resolveCustomPrompt(options.customPrompt);
 
   printBanner();
   const stopSpinner = startSpinner("Generating review");
@@ -228,4 +225,28 @@ function trimDiff(diff: string, maxSize: number): string {
   }
 
   return `${diff.slice(0, maxSize)}\n\n[Diff truncated to ${maxSize} characters]`;
+}
+
+const PROMPT_FILE_NAME = "reviuah-prompt.md";
+
+/**
+ * Resolve custom prompt: CLI --prompt > env REVIUAH_CUSTOM_PROMPT > repo root reviuah-prompt.md.
+ */
+async function resolveCustomPrompt(cliPrompt?: string): Promise<string | undefined> {
+  const fromCli = cliPrompt?.trim();
+  if (fromCli) return fromCli;
+
+  const fromEnv = process.env.REVIUAH_CUSTOM_PROMPT?.trim();
+  if (fromEnv) return fromEnv;
+
+  try {
+    const root = await getRepoRoot();
+    const path = join(root, PROMPT_FILE_NAME);
+    const content = await readFile(path, "utf8");
+    return content.trim() || undefined;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === "ENOENT") return undefined;
+    throw err;
+  }
 }

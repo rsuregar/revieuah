@@ -3,14 +3,33 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPackageRoot } from "../lib/package-root.js";
 
-export async function updateCommand(): Promise<void> {
-  const root = getPackageRoot();
-  const pkgPath = join(root, "package.json");
+function findReviuahRoot(): string | null {
+  const fromScript = getPackageRoot();
+  const fromScriptPkg = join(fromScript, "package.json");
+  if (existsSync(fromScriptPkg)) return fromScript;
 
-  if (!existsSync(pkgPath)) {
-    console.error("package.json not found. Run from the reviuah project.");
+  const cwd = process.cwd();
+  const cwdPkg = join(cwd, "package.json");
+  if (existsSync(cwdPkg)) {
+    try {
+      const pkg = JSON.parse(readFileSync(cwdPkg, "utf8")) as { name?: string };
+      if (pkg.name === "reviuah") return cwd;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+export async function updateCommand(): Promise<void> {
+  const root = findReviuahRoot();
+  if (!root) {
+    console.error("package.json not found. Run this command from the ReviuAh project root.");
+    process.exitCode = 1;
     return;
   }
+
+  const pkgPath = join(root, "package.json");
 
   let pkg: { name?: string; scripts?: { build?: string } };
   try {
