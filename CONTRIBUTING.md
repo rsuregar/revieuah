@@ -28,6 +28,7 @@ yarn link   # makes `reviuah` available globally
 4. Build and test locally:
    ```bash
    yarn build
+   yarn test
    reviuah --help
    ```
 5. Commit using [Conventional Commits](https://www.conventionalcommits.org/) format:

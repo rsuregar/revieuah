@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { execSync } from "node:child_process";
 import * as readline from "node:readline";
 import semver from "semver";
+import { showUpdatePrompt } from "../ui/update-prompt.js";
 
 const PACKAGE_NAME = "reviuah";
 const require = createRequire(import.meta.url);
@@ -14,6 +15,23 @@ const BOLD = "\x1b[1m";
 const GRAY = "\x1b[90m";
 const CYAN = "\x1b[36m";
 const RESET = "\x1b[0m";
+
+const LANG = (process.env.REVIUAH_LANG || process.env.LANG || "").toLowerCase();
+const isId = LANG.startsWith("id");
+
+const MSG = {
+  newVersion: isId
+    ? "Versi baru tersedia:"
+    : "New version available:",
+  current: isId ? "saat ini" : "current",
+  whatsNew: isId ? "Perubahan terbaru:" : "What's new:",
+  updateNow: isId ? "Update sekarang? (y/Tidak): " : "Update now? (y/N): ",
+  updating: isId ? "Memperbarui ke" : "Updating to",
+  updated: isId ? "Berhasil diperbarui ke" : "Updated to",
+  skip: isId ? "Dilewati. Update nanti:" : "Skip. Update later:",
+  updateManual: isId ? "Update manual:" : "Update:",
+  or: isId ? "atau" : "or",
+} as const;
 
 interface NpmRegistryResponse {
   "dist-tags"?: { latest?: string };
@@ -32,7 +50,8 @@ function getCurrentVersion(): string {
   }
 }
 
-function getNewerVersions(
+/** Exported for testing. Returns up to 5 newer versions sorted newest first. */
+export function getNewerVersions(
   current: string,
   time: Record<string, string>,
 ): { version: string; date: string }[] {
@@ -57,14 +76,40 @@ function askYesNo(question: string): Promise<boolean> {
 }
 
 function doUpdate(latest: string): boolean {
-  console.error(`${CYAN}Updating to ${latest}...${RESET}`);
+  console.error(`${CYAN}${MSG.updating} ${latest}...${RESET}`);
   try {
     execSync(`npm install -g ${PACKAGE_NAME}@${latest}`, { stdio: "inherit" });
-    console.error(`${GREEN}Updated to ${latest}!${RESET}\n`);
+    console.error(`${GREEN}${MSG.updated} ${latest}!${RESET}\n`);
     return true;
   } catch {
     console.error(`${YELLOW}Update failed. Run manually: npm install -g ${PACKAGE_NAME}@latest${RESET}\n`);
     return false;
+  }
+}
+
+async function showFallbackUpdatePrompt(
+  latestVersion: string,
+  currentVersion: string,
+  newer: { version: string; date: string }[],
+): Promise<void> {
+  console.error("");
+  console.error(
+    `${YELLOW}${BOLD}${MSG.newVersion} ${latestVersion}${RESET} ${YELLOW}(${MSG.current}: ${currentVersion})${RESET}`,
+  );
+  if (newer.length > 0) {
+    console.error(`${GRAY}${MSG.whatsNew}${RESET}`);
+    for (const v of newer) {
+      console.error(`${GRAY}  • ${v.version} (${v.date})${RESET}`);
+    }
+  }
+  console.error("");
+  const yes = await askYesNo(`${CYAN}${MSG.updateNow}${RESET}`);
+  if (yes) {
+    doUpdate(latestVersion);
+  } else {
+    console.error(
+      `${GRAY}${MSG.skip} npm install -g ${PACKAGE_NAME}@latest${RESET}\n`,
+    );
   }
 }
 
@@ -89,31 +134,40 @@ export async function checkForUpdates(): Promise<void> {
     const latestVersion = data["dist-tags"]?.latest?.trim();
     if (!latestVersion || !semver.valid(latestVersion) || !semver.gt(latestVersion, currentVersion)) return;
 
-    console.error(
-      `\n${YELLOW}${BOLD}New version available: ${latestVersion}${RESET}${YELLOW} (current: ${currentVersion})${RESET}`,
-    );
-
     const newer = getNewerVersions(currentVersion, data.time ?? {});
-    if (newer.length > 0) {
-      console.error(`${GRAY}What's new:${RESET}`);
-      for (const v of newer) {
-        console.error(`${GRAY}  • ${v.version} (${v.date})${RESET}`);
-      }
-    }
 
-    if (process.stdin.isTTY) {
-      console.error("");
-      const yes = await askYesNo(`${CYAN}Update now? (y/N): ${RESET}`);
-      if (yes) {
-        doUpdate(latestVersion);
-      } else {
-        console.error(
-          `${GRAY}Skip. Update later: npm install -g ${PACKAGE_NAME}@latest${RESET}\n`,
-        );
+    if (process.stdin.isTTY && process.stderr.isTTY) {
+      try {
+        const doUpdateNow = await showUpdatePrompt({
+          latestVersion: latestVersion,
+          currentVersion: currentVersion,
+          newerVersions: newer,
+          lang: isId ? "id" : "en",
+        });
+        if (doUpdateNow) {
+          doUpdate(latestVersion);
+        } else {
+          console.error(
+            `${GRAY}${MSG.skip} npm install -g ${PACKAGE_NAME}@latest${RESET}\n`,
+          );
+        }
+      } catch {
+        await showFallbackUpdatePrompt(latestVersion, currentVersion, newer);
       }
+    } else if (process.stdin.isTTY) {
+      await showFallbackUpdatePrompt(latestVersion, currentVersion, newer);
     } else {
       console.error(
-        `${GRAY}Update: npm install -g ${PACKAGE_NAME}@latest  or  yarn global add ${PACKAGE_NAME}@latest\n${RESET}`,
+        `${YELLOW}${BOLD}${MSG.newVersion} ${latestVersion}${RESET} ${YELLOW}(${MSG.current}: ${currentVersion})${RESET}`,
+      );
+      if (newer.length > 0) {
+        console.error(`${GRAY}${MSG.whatsNew}${RESET}`);
+        for (const v of newer) {
+          console.error(`${GRAY}  • ${v.version} (${v.date})${RESET}`);
+        }
+      }
+      console.error(
+        `\n${GRAY}${MSG.updateManual} npm install -g ${PACKAGE_NAME}@latest  ${MSG.or}  yarn global add ${PACKAGE_NAME}@latest\n${RESET}`,
       );
     }
   } catch {
