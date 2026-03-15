@@ -75,6 +75,32 @@ export function listProviderIds(): string[] {
   return Object.keys(PROVIDER_TEMPLATES).sort();
 }
 
+export interface ProviderTemplateItem {
+  name: string;
+  url: string;
+  defaultModel: string;
+  requiresApiKey: boolean;
+}
+
+export function getProviderTemplates(): ProviderTemplateItem[] {
+  const entries = Object.entries(PROVIDER_TEMPLATES).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  const list = entries.map(([name, t]) => ({
+    name,
+    url: t.baseURL,
+    defaultModel: t.defaultModel,
+    requiresApiKey: name !== "ollama",
+  }));
+  list.push({
+    name: "Custom",
+    url: "",
+    defaultModel: "",
+    requiresApiKey: true,
+  });
+  return list;
+}
+
 export function resolveProviderDefaults(
   providerName?: string,
 ): ProviderTemplate {

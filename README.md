@@ -61,6 +61,8 @@ reviuah --base main --out review.md
 
 **Options:** `--lang <code>`, `--out <file>`, `--strict` (exit 1 when risk is high). Run `reviuah --help` for full list.
 
+After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice (Commitah-style) and suggests updating with `npm install -g reviuah@latest`. (Skipped in CI.)
+
 ---
 
 ## Review output (Markdown)
@@ -85,6 +87,7 @@ The CLI prints structured Markdown:
 | `REVIUAH_PROVIDER` | Preset: `agentrouter`, `openai`, `gemini`, `deepseek`, `ollama`, etc. Default: `agentrouter` |
 | `REVIUAH_PROVIDER_URL` | Override API base URL |
 | `REVIUAH_MODEL` | Override model name |
+| `REVIUAH_MAX_DIFF_SIZE` | Max characters of diff sent to the API (default 120000). Lower = fewer tokens / cheaper. |
 
 Env overrides saved config (useful for CI).
 

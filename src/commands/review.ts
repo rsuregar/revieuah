@@ -6,8 +6,18 @@ import { getCommitDiff, getRangeDiff, getStagedDiff } from "../git/diff.js";
 import type { ReviewResponse } from "../providers/index.js";
 import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
+import { printBanner } from "../ui/logo.js";
+import { startSpinner } from "../ui/spinner.js";
 
-const MAX_DIFF_SIZE = 120000;
+const DEFAULT_MAX_DIFF_SIZE = 120000;
+
+function getMaxDiffSize(): number {
+  const env = process.env.REVIUAH_MAX_DIFF_SIZE?.trim();
+  if (!env) return DEFAULT_MAX_DIFF_SIZE;
+  const n = parseInt(env, 10);
+  if (!Number.isFinite(n) || n < 1000) return DEFAULT_MAX_DIFF_SIZE;
+  return Math.min(n, 500_000);
+}
 
 export interface ReviewCommandOptions {
   commit?: string;
@@ -59,15 +69,23 @@ export async function reviewCommand(
     return { markdown: emptyMarkdown, risk: "unknown" };
   }
 
-  const trimmedDiff = trimDiff(diff, MAX_DIFF_SIZE);
+  const maxSize = getMaxDiffSize();
+  const trimmedDiff = trimDiff(diff, maxSize);
 
   const credentials = await resolveReviewCredentials();
   const provider = createProvider(credentials);
 
-  const result = await provider.review({
-    diff: trimmedDiff,
-    language: options.lang,
-  });
+  printBanner();
+  const stopSpinner = startSpinner("Reviewing");
+  let result: ReviewResponse;
+  try {
+    result = await provider.review({
+      diff: trimmedDiff,
+      language: options.lang,
+    });
+  } finally {
+    stopSpinner();
+  }
 
   await outputReview(result.markdown, options.out);
 

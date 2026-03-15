@@ -1,4 +1,3 @@
-import select from "@inquirer/select";
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
@@ -10,6 +9,8 @@ import {
 } from "../config/user-config.js";
 import { readSecretLine } from "../lib/read-secret.js";
 import { listProviderIds, resolveProviderDefaults } from "../providers/openai.js";
+import { SetupWizard } from "../ui/setup-wizard.js";
+import { selectBox } from "../ui/select-box.js";
 
 async function question(defaultLabel: string, def?: string): Promise<string> {
   const rl = readline.createInterface({ input, output });
@@ -25,6 +26,22 @@ async function question(defaultLabel: string, def?: string): Promise<string> {
 export async function setupCommand(): Promise<void> {
   const existing = await readUserConfig();
   const path = getUserConfigPath();
+
+  // Prefer full-screen wizard when stdin is TTY (interactive); stdout must be TTY for blessed to draw.
+  const useWizard = input.isTTY && output.isTTY;
+  if (useWizard) {
+    try {
+      const saved = await new SetupWizard(existing).run();
+      if (saved) {
+        console.error("\nSelesai. Coba: reviuah (review staged) atau reviuah --base main");
+      }
+      return;
+    } catch (err) {
+      console.error("Wizard error, falling back to simple prompts:", err);
+    }
+  } else if (input.isTTY) {
+    console.error("Tip: jalankan reviuah setup di terminal langsung (bukan via pipe) untuk form penuh.\n");
+  }
 
   console.error("ReviuAh setup — menyimpan konfigurasi di:");
   console.error(`  ${path}`);
@@ -58,18 +75,9 @@ export async function setupCommand(): Promise<void> {
 
   const providerIds = listProviderIds();
   const defaultProv = existing?.provider?.trim() || "agentrouter";
-  let provider: string;
-  try {
-    provider = await select({
-      message: "Pilih provider (↑/↓ pilih, Enter konfirmasi)",
-      choices: providerIds.map((id) => ({ name: id, value: id })),
-      default: defaultProv,
-    });
-  } catch {
-    provider =
-      (await question(`Provider (${providerIds.join(", ")})`, defaultProv))
-        .toLowerCase() || defaultProv;
-  }
+  const provider =
+    (await selectBox("Pilih provider", providerIds, defaultProv)) ||
+    defaultProv;
   const defaults = resolveProviderDefaults(provider);
 
   const rl2 = readline.createInterface({ input, output });
