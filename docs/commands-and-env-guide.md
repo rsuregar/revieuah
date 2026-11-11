@@ -224,7 +224,7 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_LOG_TOKEN_BUDGET` | No | disabled | Set `1` / `true` to print an estimated input token budget summary after diff preparation |
 | `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. See the sample prompt example above for a reusable team template. |
 | `REVIUAH_FIX_VERIFY_CMD` | No | — | Command `reviuah fix` runs before and after patching (same as `--verify`), e.g. `yarn lint && yarn test`. Without it, patches are applied but marked unverified and never offered for staging. |
-| `GITLAB_TOKEN` | For `fix --mr` | — | GitLab token with `read_api` scope. Read-only; ReviuAh never writes to GitLab. The host and project come from `git remote get-url origin` (https, `ssh://`, and scp-like remotes; self-hosted works). |
+| `GITLAB_TOKEN` | For `fix --mr` | — | GitLab token with `read_api` scope (falls back to `GITLAB_AUTH_TOKEN` when unset). Read-only; ReviuAh never writes to GitLab. The host and project come from `git remote get-url origin` (https, `ssh://`, and scp-like remotes; self-hosted works). |
 
 ### Example usage with env
 

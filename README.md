@@ -141,7 +141,7 @@ The CLI prints structured Markdown:
 | `REVIUAH_LOG_TOKEN_BUDGET`   | Set to `1` / `true` to print a stderr summary of diff chars, estimated input tokens, kept files, filtered files, and truncation status. |
 | `REVIUAH_CUSTOM_PROMPT`      | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
 | `REVIUAH_FIX_VERIFY_CMD`     | Command `reviuah fix` runs before and after patching, e.g. `yarn lint && yarn test`. Same as `--verify`. Without it, patches are applied but marked unverified and never offered for staging. |
-| `GITLAB_TOKEN`               | Token with `read_api` scope for `reviuah fix --mr`. Read-only: ReviuAh never writes to GitLab. |
+| `GITLAB_TOKEN`               | Token with `read_api` scope for `reviuah fix --mr`. Read-only: ReviuAh never writes to GitLab. Falls back to `GITLAB_AUTH_TOKEN` when unset. |
 
 **Reducing token usage:** `reviuah` now uses the best-practice compact path by default, so you automatically get shorter reviews and smaller diff context. Use `--no-compact` or `REVIUAH_COMPACT=0` if you want fuller review output instead. You can still lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. ReviuAh also filters token-heavy files such as lockfiles, build outputs, minified assets, and common binaries before sending the diff, prioritizes higher-signal code files over low-signal docs/config when truncation is needed, and trims at file boundaries instead of hard-cutting raw text. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length. For repo-specific noise, set `REVIUAH_DIFF_EXCLUDE_PATTERNS` to exclude extra paths, and enable `REVIUAH_LOG_TOKEN_BUDGET=1` to inspect the prepared diff budget in CI logs.
 

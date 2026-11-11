@@ -43,7 +43,7 @@ export function assertSingleSource(source: FindingsSource): void {
 export function parseGitLabToken(raw: string | undefined): string {
   const token = raw?.trim();
   if (!token) {
-    throw new Error("GITLAB_TOKEN is not set. Create a token with read_api scope and export it.");
+    throw new Error("GITLAB_TOKEN (or GITLAB_AUTH_TOKEN) is not set. Create a token with read_api scope and export it.");
   }
   if (!/^[\x21-\x7e]+$/.test(token)) {
     throw new Error(
@@ -69,7 +69,7 @@ async function warnIfCheckoutLacksMrHead(
 
 async function loadFromGitLab(mr: string, root: string): Promise<FileComment[]> {
   const iid = parseMrIid(mr);
-  const token = parseGitLabToken(process.env.GITLAB_TOKEN);
+  const token = parseGitLabToken(process.env.GITLAB_TOKEN || process.env.GITLAB_AUTH_TOKEN);
   const project = parseGitLabRemote(await getOriginUrl(root));
   console.error(`GitLab: ${project.projectPath} MR !${iid}`);
   await warnIfCheckoutLacksMrHead(project, iid, token, root);
