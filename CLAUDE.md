@@ -26,15 +26,17 @@ Bin names: **`reviuah`** and **`reviewah`** (alias). Entry: `src/cli.ts` → `di
 | Area | Path |
 |------|------|
 | CLI & flags | `src/cli.ts` |
-| Commands | `src/commands/` (review, setup, config-status, update, version-bump) |
+| Commands | `src/commands/` (review, fix, setup, config-status, update, version-bump) |
 | Diff collection | `src/git/diff.ts` |
 | Provider interface | `src/providers/index.ts` |
 | Provider factory | `src/providers/factory.ts` |
 | OpenAI-compatible provider | `src/providers/openai.ts` (handles all providers including Gemini) |
 | Per-file prompt/parser | `src/providers/per-file-prompt.ts` |
-| Config | `src/config/user-config.ts` |
+| Fix prompt/parser | `src/providers/fix-prompt.ts` |
+| Config | `src/config/` (user-config, diff-limits, custom-prompt) |
 | Shared utils | `src/lib/` (package-root, check-update, read-secret) |
-| UI components | `src/ui/` (logo, spinner, setup-wizard, select-box) |
+| Fix (patch review findings) | `src/fix/` (findings, load-findings, gitlab-discussions, context, safe-path, patch-applier, propose, apply-session, verify, git-state) + `src/commands/fix.ts` |
+| UI components | `src/ui/` (logo, spinner, setup-wizard, select-box, confirm-patch) |
 
 ## Config & env
 

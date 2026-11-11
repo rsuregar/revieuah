@@ -19,7 +19,7 @@ Or with yarn:
 yarn global add reviuah
 ```
 
-**Requirements:** Node.js 20+ (22 LTS recommended; CI uses Node 22). Git. Commands: `reviuah` or `reviewah` (same).
+**Requirements:** Node.js 20+ (22 LTS recommended; CI uses Node 22). Git. Commands: `reviu`, `reviuah` or `reviewah` (same).
 
 ---
 
@@ -32,6 +32,15 @@ reviuah setup
 ```
 
 Interactive setup saves config to `~/.reviuah/config.json`. You can also set `REVIUAH_API_KEY` (and optionally `REVIUAH_PROVIDER`, `REVIUAH_MODEL`) in your environment. Check status: `reviuah config`.
+
+**Use a CLI that is already logged in (OAuth, subscriptions):** set `REVIUAH_PROVIDER=command` and `REVIUAH_COMMAND` to a command that reads the prompt on stdin and prints the answer on stdout. The CLI keeps its own login; ReviuAh never sees or stores its credentials. Example with `omp` on an Antigravity model (tools off, so it only answers):
+
+```bash
+export REVIUAH_PROVIDER=command
+export REVIUAH_COMMAND="omp -p --no-tools --no-session --no-skills --no-rules --no-context-files --no-extensions --no-lsp --model google-antigravity/gemini-2.5-flash"
+```
+
+The command runs through your shell, so only set it from environment or your own `~/.reviuah/config.json` (`"command"`). Token usage is not reported in this mode, and `REVIUAH_REQUEST_TIMEOUT_MS` (default 60000) also bounds the command: raise it for slow models.
 
 **2. Run a review:**
 
@@ -69,6 +78,36 @@ By default, `reviuah` follows the recommended low-token path: compact review out
 
 After a review run, if a newer version is available on npm, ReviuAh prints a one-line notice (Commitah-style) and suggests updating with `npm install -g reviuah@latest`. (Skipped in CI.)
 
+### Fix review findings
+
+`reviuah fix` turns the comments of a per-file review into patches on your working tree. Every patch is shown as a diff and needs your approval; nothing is committed.
+
+```bash
+reviuah --base main --per-file --out review.json
+reviuah fix --input review.json --verify "yarn lint && yarn test"
+```
+
+| Option | Description |
+| --- | --- |
+| `--input <file>` | `review.json` from `--per-file --out`. Use this **or** `--mr`. |
+| `--mr <number>` | GitLab merge request number. Needs `GITLAB_TOKEN`. Use this **or** `--input`. |
+| `--verify <cmd>` | Runs before patching (baseline) and once after. Or set `REVIUAH_FIX_VERIFY_CMD`. |
+| `--dry-run` | Print diffs only; write nothing. |
+| `--yes` | Apply every valid patch without prompting. Never stages. Required when there is no TTY (unless `--dry-run`). |
+| `--lang <code>`, `--prompt <text>` | Language of explanations; extra instructions. `AGENTS.md` in the repo root is included automatically. |
+
+**From a GitLab merge request** instead of a file: `GITLAB_TOKEN=... reviuah fix --mr 1237`. ReviuAh reads the project from `git remote get-url origin`, takes the unresolved diff threads that point at a line of the new file (all notes of a thread, with author), and proposes patches. MR comments are untrusted input, so `--yes` is refused with `--mr`; every patch needs your approval. Threads on removed lines are skipped and reported.
+
+How it behaves:
+
+- Each patch is a search/replace block that must match the file exactly and exactly once; otherwise it is skipped (line numbers in `review.json` are only hints).
+- Only files named in the review are touched. Absolute paths, `..`, and symlinks leaving the repo are refused. Lockfiles, build output, binaries, `REVIUAH_DIFF_EXCLUDE_PATTERNS` matches, and files over `REVIUAH_MAX_DIFF_SIZE` are skipped and never sent to the model. Other file content is sent to your configured provider.
+- If verification fails you can roll back (default), try again once with the failure output as context, or keep the changes. Rollback restores the patched files only; your git index and stash are untouched.
+- After passing verification you are offered `git add` for patched files, except files that already had unstaged changes.
+- Diffs show only the lines that change. Comments for which the model proposed no patch are listed and counted in the summary, so a comment is never dropped silently.
+- With `--mr`, ReviuAh warns when the MR's head commit is not in your checked-out history (wrong branch, or not pulled): line numbers and code may then not match the comments.
+- Each file reports its time and token usage (`in / out`, when the provider reports it) on stderr, followed by a total elapsed time. `GITLAB_TOKEN` must be printable ASCII without whitespace; an invalid value is rejected without being printed.
+
 ---
 
 ## Review output (Markdown)
@@ -101,6 +140,8 @@ The CLI prints structured Markdown:
 | `REVIUAH_DIFF_EXCLUDE_PATTERNS` | Extra comma-separated regex patterns for diff paths to exclude before sending to the model. Useful in CI for repo-specific generated files. |
 | `REVIUAH_LOG_TOKEN_BUDGET`   | Set to `1` / `true` to print a stderr summary of diff chars, estimated input tokens, kept files, filtered files, and truncation status. |
 | `REVIUAH_CUSTOM_PROMPT`      | Custom instructions for the reviewer (e.g. focus on security, follow our style guide). Same effect as `--prompt`. |
+| `REVIUAH_FIX_VERIFY_CMD`     | Command `reviuah fix` runs before and after patching, e.g. `yarn lint && yarn test`. Same as `--verify`. Without it, patches are applied but marked unverified and never offered for staging. |
+| `GITLAB_TOKEN`               | Token with `read_api` scope for `reviuah fix --mr`. Read-only: ReviuAh never writes to GitLab. |
 
 **Reducing token usage:** `reviuah` now uses the best-practice compact path by default, so you automatically get shorter reviews and smaller diff context. Use `--no-compact` or `REVIUAH_COMPACT=0` if you want fuller review output instead. You can still lower `REVIUAH_MAX_DIFF_SIZE` (e.g. `60000`) to send less diff. ReviuAh also filters token-heavy files such as lockfiles, build outputs, minified assets, and common binaries before sending the diff, prioritizes higher-signal code files over low-signal docs/config when truncation is needed, and trims at file boundaries instead of hard-cutting raw text. Set `REVIUAH_MAX_OUTPUT_TOKENS` (e.g. `1500`) to cap response length. For repo-specific noise, set `REVIUAH_DIFF_EXCLUDE_PATTERNS` to exclude extra paths, and enable `REVIUAH_LOG_TOKEN_BUDGET=1` to inspect the prepared diff budget in CI logs.
 

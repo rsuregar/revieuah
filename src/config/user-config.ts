@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile, chmod } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { CommandCredentials, ProviderCredentials } from "../providers/index.js";
 import { resolveProviderDefaults } from "../providers/openai.js";
 
 export interface UserConfig {
@@ -8,6 +9,8 @@ export interface UserConfig {
   provider?: string;
   providerUrl?: string;
   model?: string;
+  /** Shell command for provider "command", e.g. `omp -p --no-tools --no-session`. */
+  command?: string;
 }
 
 const CONFIG_DIR = join(homedir(), ".reviuah");
@@ -42,13 +45,25 @@ export function maskApiKey(key: string): string {
   return `${key.slice(0, 4)}…${key.slice(-4)}`;
 }
 
+/** Provider name that runs a local CLI instead of calling an HTTP API. */
+export const COMMAND_PROVIDER = "command";
+
 /** Env wins over file (CI-friendly). */
-export async function resolveReviewCredentials(): Promise<{
-  apiKey: string;
-  baseURL: string;
-  model: string;
-}> {
+export async function resolveReviewCredentials(): Promise<ProviderCredentials | CommandCredentials> {
   const file = await readUserConfig();
+
+  const providerName =
+    process.env.REVIUAH_PROVIDER?.trim() || file?.provider?.trim();
+
+  if (providerName?.toLowerCase() === COMMAND_PROVIDER) {
+    const command = process.env.REVIUAH_COMMAND?.trim() || file?.command?.trim();
+    if (!command) {
+      throw new Error(
+        "Provider 'command' needs a command. Set REVIUAH_COMMAND, e.g. REVIUAH_COMMAND=\"omp -p --no-tools --no-session\".",
+      );
+    }
+    return { command };
+  }
 
   const apiKey = process.env.REVIUAH_API_KEY?.trim() || file?.apiKey?.trim();
   if (!apiKey) {
@@ -57,8 +72,6 @@ export async function resolveReviewCredentials(): Promise<{
     );
   }
 
-  const providerName =
-    process.env.REVIUAH_PROVIDER?.trim() || file?.provider?.trim();
   const defaults = resolveProviderDefaults(providerName);
 
   const baseURL =

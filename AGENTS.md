@@ -21,16 +21,18 @@ This file orients coding agents (Cursor, Claude Code, etc.) working on **ReviuAh
 ```
 src/
 ├── cli.ts                  # Commander entrypoint (flags, subcommands)
-├── commands/               # One file per command (review, setup, config, update, version)
-├── config/user-config.ts   # Read/write ~/.reviuah/config.json, env resolution
-├── git/diff.ts             # Git operations (staged, commit, range)
+├── commands/               # One file per command (review, fix, setup, config, update, version)
+├── config/                 # user-config (~/.reviuah/config.json, env), diff-limits, custom-prompt
+├── fix/                    # `fix` internals: findings, load-findings, gitlab-discussions, context, safe-path, patch-applier, propose, apply-session, verify, git-state
+├── git/                    # Git operations (diff.ts: staged, commit, range; prepare-diff.ts: filtering)
 ├── lib/                    # Shared utilities (package-root, check-update, read-secret)
 ├── providers/
-│   ├── index.ts            # Provider interface, types (ReviewResponse, FileComment, etc.)
+│   ├── index.ts            # Provider interface, types (ReviewResponse, FileComment, FixRequest, FixPatch, etc.)
 │   ├── factory.ts          # createProvider() → OpenAIProvider
 │   ├── openai.ts           # OpenAI-compatible provider (all providers incl. Gemini) + templates
-│   └── per-file-prompt.ts  # Shared prompt + parser for per-file inline review
-└── ui/                     # TUI components (banner, spinner, wizard, select-box)
+│   ├── per-file-prompt.ts  # Shared prompt + parser for per-file inline review
+│   └── fix-prompt.ts       # Prompt + parser for search/replace fix patches
+└── ui/                     # TUI components (banner, spinner, wizard, select-box, confirm-patch)
 ```
 
 ## Project skills (Cursor)

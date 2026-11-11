@@ -74,6 +74,14 @@ function isExcludedPath(path: string, extraPatterns: RegExp[]): boolean {
   );
 }
 
+/** True when a path is filtered out of LLM input (lockfiles, build output, binaries, user patterns). */
+export function isExcludedFilePath(
+  path: string,
+  extraPatterns: string[] = [],
+): boolean {
+  return isExcludedPath(path, compileExtraPatterns(extraPatterns));
+}
+
 function isLowSignalPath(path: string): boolean {
   return LOW_SIGNAL_PATH_PATTERNS.some((pattern) => pattern.test(path));
 }

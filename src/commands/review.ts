@@ -1,11 +1,10 @@
-import { writeFile, access, mkdir, stat, readFile } from "node:fs/promises";
+import { writeFile, access, mkdir, stat } from "node:fs/promises";
 import { constants } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { execa } from "execa";
+import { dirname, resolve } from "node:path";
 import {
+  ensureGitRepository,
   getCommitDiff,
   getRangeDiff,
-  getRepoRoot,
   getStagedDiff,
 } from "../git/diff.js";
 import { prepareDiffForReview } from "../git/prepare-diff.js";
@@ -15,27 +14,13 @@ import type {
 } from "../providers/index.js";
 import { createProvider } from "../providers/factory.js";
 import { resolveReviewCredentials } from "../config/user-config.js";
+import { resolveCustomPrompt } from "../config/custom-prompt.js";
+import {
+  getExtraDiffExcludePatterns,
+  getMaxDiffSize,
+} from "../config/diff-limits.js";
 import { printBanner } from "../ui/logo.js";
 import { startSpinner } from "../ui/spinner.js";
-
-const DEFAULT_MAX_DIFF_SIZE = 120000;
-
-function getMaxDiffSize(): number {
-  const env = process.env.REVIUAH_MAX_DIFF_SIZE?.trim();
-  if (!env) return DEFAULT_MAX_DIFF_SIZE;
-  const n = parseInt(env, 10);
-  if (!Number.isFinite(n) || n < 1000) return DEFAULT_MAX_DIFF_SIZE;
-  return Math.min(n, 500_000);
-}
-
-function getExtraDiffExcludePatterns(): string[] {
-  const raw = process.env.REVIUAH_DIFF_EXCLUDE_PATTERNS?.trim();
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
 
 function isTokenLoggingEnabled(): boolean {
   const raw = process.env.REVIUAH_LOG_TOKEN_BUDGET?.trim().toLowerCase();
@@ -293,15 +278,6 @@ function resolveCompactMode(cliCompact?: boolean): boolean {
   return !(env === "0" || env === "false" || env === "no");
 }
 
-async function ensureGitRepository(): Promise<void> {
-  const check = await execa("git", ["rev-parse", "--is-inside-work-tree"], {
-    reject: false,
-  });
-  if (check.exitCode !== 0 || check.stdout.trim() !== "true") {
-    throw new Error("ReviuAh must be run inside a git repository.");
-  }
-}
-
 async function resolveDiff(
   options: ReviewCommandOptions,
   compact = false,
@@ -332,30 +308,4 @@ async function resolveDiff(
   }
 
   return getStagedDiff({ contextLines });
-}
-
-const PROMPT_FILE_NAME = "reviuah-prompt.md";
-
-/**
- * Resolve custom prompt: CLI --prompt > env REVIUAH_CUSTOM_PROMPT > repo root reviuah-prompt.md.
- */
-async function resolveCustomPrompt(
-  cliPrompt?: string,
-): Promise<string | undefined> {
-  const fromCli = cliPrompt?.trim();
-  if (fromCli) return fromCli;
-
-  const fromEnv = process.env.REVIUAH_CUSTOM_PROMPT?.trim();
-  if (fromEnv) return fromEnv;
-
-  try {
-    const root = await getRepoRoot();
-    const path = join(root, PROMPT_FILE_NAME);
-    const content = await readFile(path, "utf8");
-    return content.trim() || undefined;
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException)?.code;
-    if (code === "ENOENT") return undefined;
-    throw err;
-  }
 }
