@@ -104,50 +104,82 @@ jobs:
             }
             if (!data.comments || data.comments.length === 0) return;
 
-            // Dismiss previous ReviuAh reviews to avoid duplicates
-            const { data: reviews } = await github.rest.pulls.listReviews({
+            // 1. Fetch existing review comments on the PR
+            const { data: existingComments } = await github.rest.pulls.listReviewComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number,
             });
-            for (const r of reviews) {
-              if (r.body?.includes('<!-- reviuah-inline -->') && r.state === 'COMMENTED') {
-                try {
-                  await github.rest.pulls.dismissReview({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: context.issue.number,
-                    review_id: r.id,
-                    message: 'Superseded by new ReviuAh review.',
-                  });
-                } catch { /* dismiss may fail if not approved/changes_requested */ }
-              }
-            }
 
             // Map severity to emoji
             const emoji = { critical: '🔴', warning: '🟡', suggestion: '💡', praise: '✅' };
+            const BOT_MARKER = '<!-- reviuah-inline -->';
 
-            // Build review comments array (include optional suggestionCode as code block)
-            const prComments = data.comments
+            // 2. Prepare new comments
+            const newComments = data.comments
               .filter(c => c.path && c.line > 0 && c.body)
               .map(c => {
                 let body = `${emoji[c.severity] || '💡'} **${c.severity}**: ${c.body}`;
                 if (c.suggestionCode && c.suggestionCode.trim()) {
                   body += `\n\n**Suggested fix:**\n\`\`\`\n${c.suggestionCode.trim()}\n\`\`\``;
                 }
-                return { path: c.path, line: c.line, side: 'RIGHT', body };
+                return { path: c.path, line: c.line, side: 'RIGHT', body: `${body}\n\n${BOT_MARKER}` };
               });
 
-            if (prComments.length === 0) return;
+            const commentsToCreate = [];
+            const matchedIds = new Set();
 
-            const summaryLine = `<!-- reviuah-inline -->\n🔍 **ReviuAh per-file review** — ${prComments.length} comment(s), risk: **${data.risk || 'unknown'}**`;
+            // 3. Sync: Update existing or Create new
+            for (const newC of newComments) {
+              // Find existing comment on same file & line
+              const match = existingComments.find(ex => 
+                ex.path === newC.path && 
+                ex.line === newC.line && 
+                ex.body?.includes(BOT_MARKER)
+              );
 
-            await github.rest.pulls.createReview({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              commit_id: context.payload.pull_request.head.sha,
-              body: summaryLine,
-              event: 'COMMENT',
-              comments: prComments,
-            });
+              if (match) {
+                matchedIds.add(match.id);
+                // Update if content changed
+                if (match.body.trim() !== newC.body.trim()) {
+                  console.log(`Updating comment ${match.id} on ${newC.path}:${newC.line}`);
+                  await github.rest.pulls.updateReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: match.id,
+                    body: newC.body
+                  });
+                }
+              } else {
+                commentsToCreate.push(newC);
+              }
+            }
+
+            // 4. Cleanup: Delete comments for issues that are fixed (not in new review)
+            for (const ex of existingComments) {
+              if (ex.body?.includes(BOT_MARKER) && !matchedIds.has(ex.id)) {
+                console.log(`Deleting fixed comment ${ex.id} on ${ex.path}:${ex.line}`);
+                try {
+                  await github.rest.pulls.deleteReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: ex.id,
+                  });
+                } catch (e) { console.error('Failed to delete comment:', e.message); }
+              }
+            }
+
+            // 5. Create new comments in a batch
+            if (commentsToCreate.length > 0) {
+              console.log(`Creating ${commentsToCreate.length} new comments.`);
+              const summaryLine = `🔍 **ReviuAh per-file review** — ${commentsToCreate.length} new comment(s), risk: **${data.risk || 'unknown'}**`;
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                commit_id: context.payload.pull_request.head.sha,
+                body: summaryLine,
+                event: 'COMMENT',
+                comments: commentsToCreate,
+              });
+            }

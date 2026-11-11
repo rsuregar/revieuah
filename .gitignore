@@ -9,3 +9,7 @@ dist
 coverage
 review.md
 review.json
+
+# Personal OKR docs (not for the repo)
+docs/okr-fix-notes.md
+docs/rfc-ai-code-remediation-fix.md

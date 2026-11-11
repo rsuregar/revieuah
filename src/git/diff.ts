@@ -72,3 +72,13 @@ export async function getRepoRoot(): Promise<string> {
   }
   return result.stdout.trim();
 }
+
+/** Throws unless the cwd is inside a git work tree. */
+export async function ensureGitRepository(): Promise<void> {
+  const check = await execa("git", ["rev-parse", "--is-inside-work-tree"], {
+    reject: false,
+  });
+  if (check.exitCode !== 0 || check.stdout.trim() !== "true") {
+    throw new Error("ReviuAh must be run inside a git repository.");
+  }
+}

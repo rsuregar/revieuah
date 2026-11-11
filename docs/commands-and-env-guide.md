@@ -14,8 +14,9 @@ Complete reference for every ReviuAh CLI command and environment variable.
 | `reviuah config --update` | Run setup again to change config |
 | `reviuah version <patch\|minor\|major>` | Bump package version (for release) |
 | `reviuah update` | Reinstall dependencies and rebuild (development) |
+| `reviuah fix --input <file>` / `--mr <n>` | Apply review findings (from `review.json` or GitLab MR threads) as approved patches (see §6) |
 
-Alias: **`reviewah`** = **`reviuah`** (identical).
+Aliases: **`reviu`** = **`reviewah`** = **`reviuah`** (identical).
 
 ---
 
@@ -173,6 +174,36 @@ Must be run from the **ReviuAh project root** (not from another repo).
 
 ---
 
+## 6. Fix — `reviuah fix`
+
+Applies the comments of a per-file review as patches to the working tree. Each patch is shown as a diff and needs approval; nothing is committed.
+
+```bash
+reviuah --base main --per-file --out review.json
+reviuah fix --input review.json --verify "yarn lint && yarn test"
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--input <file>` | — | `review.json` from `--per-file --out`. Use this **or** `--mr` |
+| `--mr <number>` | — | GitLab merge request number (needs `GITLAB_TOKEN`). Use this **or** `--input` |
+| `--verify <cmd>` | `REVIUAH_FIX_VERIFY_CMD` | Run before patching (baseline) and once after all patches |
+| `--dry-run` | `false` | Print diffs only; write nothing |
+| `--yes` | `false` | Apply every valid patch without prompting; never stages. Required without a TTY unless `--dry-run` |
+| `--lang <code>` | `en` | Language of the explanations |
+| `--prompt <text>` | — | Extra instructions. `AGENTS.md` (first 8000 chars) and `reviuah-prompt.md` / `REVIUAH_CUSTOM_PROMPT` are included too |
+
+Approval keys: `y` apply, `n` skip, `a` apply all remaining, `q` quit. Unknown input means no.
+
+- A patch is a search/replace block that must match the file exactly and exactly once, else it is skipped. Line numbers in `review.json` are hints only.
+- Only files named in the review are touched. Absolute paths, `..`, and symlinks leaving the repo are refused. Lockfiles, build output, binaries, `REVIUAH_DIFF_EXCLUDE_PATTERNS` matches, and files over `REVIUAH_MAX_DIFF_SIZE` are skipped and not sent to the model; other file content is sent to the configured provider.
+- Verification failure: rollback (default), try again once with the failure output as context, or keep. With `--yes` it rolls back. Rollback restores patched files only; git index and stash are untouched. Exit code is 1 on failed verification.
+- No `--verify` / `REVIUAH_FIX_VERIFY_CMD`, or a failing baseline: patches are applied but unverified, and `git add` is not offered.
+- `--mr <number>`: fetches the MR's discussions from GitLab and keeps unresolved diff threads on a line of the new file. A thread's body joins all its notes with authors, so follow-ups like "fine to ignore" reach the fixer. Threads on removed lines are skipped and reported. MR comments are untrusted input, so `--yes` is refused with `--mr`.
+- After passing verification, `git add` is offered for patched files that had no unstaged changes beforehand.
+
+---
+
 ## Environment variables
 
 Env vars **override** the config file. Useful for CI or one-off overrides.
@@ -183,6 +214,7 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_PROVIDER` | No | `agentrouter` | Preset: `openai`, `gemini`, `anthropic`, `deepseek`, `groq`, `mistral`, `together`, `fireworks`, `openrouter`, `cerebras`, `glm`, `ollama`, `agentrouter` |
 | `REVIUAH_PROVIDER_URL` | No | from preset | Override API base URL |
 | `REVIUAH_MODEL` | No | from preset | Override model name |
+| `REVIUAH_COMMAND` | With `REVIUAH_PROVIDER=command` | — | Shell command that reads the prompt on stdin and prints the answer on stdout, e.g. `omp -p --no-tools --no-session --model google-antigravity/gemini-2.5-flash`. The CLI handles its own login; no API key is used. Runs through your shell, so set it only from your own env or `~/.reviuah/config.json`. |
 | `REVIUAH_MAX_DIFF_SIZE` | No | 120000 | Max characters of diff sent after ReviuAh filters token-heavy files, prioritizes higher-signal files, and truncates at file boundaries (smaller = cheaper) |
 | `REVIUAH_REQUEST_TIMEOUT_MS` | No | 60000 | Request timeout to API (ms) |
 | `REVIUAH_ENABLE_SUMMARY` | No | enabled | Set `0` / `false` to disable summary markdown generation (same as `--no-summary`) |
@@ -191,6 +223,8 @@ Env vars **override** the config file. Useful for CI or one-off overrides.
 | `REVIUAH_DIFF_EXCLUDE_PATTERNS` | No | — | Extra comma-separated regex patterns for diff paths to exclude before sending to the LLM (for example `(^|/)fixtures/,\\.snap$`) |
 | `REVIUAH_LOG_TOKEN_BUDGET` | No | disabled | Set `1` / `true` to print an estimated input token budget summary after diff preparation |
 | `REVIUAH_CUSTOM_PROMPT` | No | — | Custom instructions for the reviewer (same as `--prompt`). If unset, ReviuAh uses `reviuah-prompt.md` in repo root when present. See the sample prompt example above for a reusable team template. |
+| `REVIUAH_FIX_VERIFY_CMD` | No | — | Command `reviuah fix` runs before and after patching (same as `--verify`), e.g. `yarn lint && yarn test`. Without it, patches are applied but marked unverified and never offered for staging. |
+| `GITLAB_TOKEN` | For `fix --mr` | — | GitLab token with `read_api` scope (falls back to `GITLAB_AUTH_TOKEN` when unset). Read-only; ReviuAh never writes to GitLab. The host and project come from `git remote get-url origin` (https, `ssh://`, and scp-like remotes; self-hosted works). |
 
 ### Example usage with env
 

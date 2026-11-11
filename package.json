@@ -25,6 +25,7 @@
   ],
   "type": "module",
   "bin": {
+    "reviu": "dist/cli.js",
     "reviuah": "dist/cli.js",
     "reviewah": "dist/cli.js"
   },
@@ -36,7 +37,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
-    "test": "yarn build && node --test dist/lib/check-update.test.js dist/ui/update-prompt.test.js",
+    "test": "yarn build && node --test dist/lib/check-update.test.js dist/ui/update-prompt.test.js dist/fix/patch-applier.test.js dist/fix/fix-support.test.js dist/fix/gitlab-discussions.test.js dist/providers/fix-prompt.test.js dist/providers/command.test.js",
     "start": "node dist/cli.js",
     "version:patch": "node scripts/bump-version.mjs patch",
     "version:minor": "node scripts/bump-version.mjs minor",

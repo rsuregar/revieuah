@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { reviewCommand } from "./commands/review.js";
 import { setupCommand } from "./commands/setup.js";
 import { configStatusCommand } from "./commands/config-status.js";
+import { fixCommand } from "./commands/fix.js";
 import { updateCommand } from "./commands/update.js";
 import { versionBumpCommand } from "./commands/version-bump.js";
 import { checkForUpdates } from "./lib/check-update.js";
@@ -64,6 +65,46 @@ program
       await configStatusCommand();
     }
   });
+
+program
+  .command("fix")
+  .description(
+    "Apply review findings as patches to the working tree (from review.json or unresolved GitLab MR threads)",
+  )
+  .option("--input <file>", "review.json produced by: reviuah --per-file --out review.json")
+  .option(
+    "--mr <number>",
+    "GitLab merge request number: fix its unresolved diff threads (needs GITLAB_TOKEN with read_api; reads project from git remote origin)",
+  )
+  .option("--dry-run", "print the proposed diffs without writing anything", false)
+  .option("--yes", "apply every valid patch without prompting (never stages)", false)
+  .option(
+    "--verify <cmd>",
+    "command run after patching, e.g. 'yarn lint && yarn test' (or set REVIUAH_FIX_VERIFY_CMD)",
+  )
+  .option("--lang <lang>", "language for explanations", "en")
+  .option("--prompt <text>", "extra instructions for the fixer")
+  .action(
+    async (opts: {
+      input?: string;
+      mr?: string;
+      dryRun?: boolean;
+      yes?: boolean;
+      verify?: string;
+      lang?: string;
+      prompt?: string;
+    }) => {
+      await fixCommand({
+        input: opts.input,
+        mr: opts.mr,
+        dryRun: Boolean(opts.dryRun),
+        yes: Boolean(opts.yes),
+        verify: opts.verify,
+        lang: opts.lang ?? "en",
+        prompt: opts.prompt,
+      });
+    },
+  );
 
 // All commands (setup, config, version, update) are visible in --help by default.
 program

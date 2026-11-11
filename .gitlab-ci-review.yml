@@ -161,15 +161,58 @@ code-review:
         echo "Debug: head SHA:             $HEAD_SHA"
 
         EMOJI_MAP='{"critical":"🔴","warning":"🟡","suggestion":"💡","praise":"✅"}'
+        BOT_MARKER='<!-- reviuah-inline -->'
+
+        # Simple KISS approach:
+        # - Before posting new discussions, delete ALL existing ReviuAh inline discussions (those whose first note body contains BOT_MARKER).
+        #   This avoids duplicate threads on the same file/line while keeping the script simple.
+        echo "Debug: cleaning up previous ReviuAh inline discussions (if any)..."
+        DISCUSSIONS_RESPONSE=$(mktemp)
+        DISCUSSIONS_HTTP_CODE=$(curl -sS -o "$DISCUSSIONS_RESPONSE" -w "%{http_code}" \
+          -H "PRIVATE-TOKEN: $TOKEN" \
+          "$API_BASE/discussions?per_page=100" || true)
+        echo "Debug: list discussions HTTP status: $DISCUSSIONS_HTTP_CODE"
+        if [ "$DISCUSSIONS_HTTP_CODE" = "200" ] && command -v jq > /dev/null 2>&1; then
+          jq -r --arg m "$BOT_MARKER" '
+            .[] |
+            select(.notes[0].body | contains($m)) |
+            .id
+          ' "$DISCUSSIONS_RESPONSE" 2>/dev/null | while IFS= read -r DID; do
+            if [ -n "$DID" ]; then
+              echo "Debug: deleting previous ReviuAh discussion id=$DID"
+              curl -sS -o /dev/null -w "%{http_code}" \
+                -X DELETE -H "PRIVATE-TOKEN: $TOKEN" \
+                "$API_BASE/discussions/$DID" || true
+            fi
+          done
+        else
+          echo "Debug: unable to list discussions for cleanup (no jq or non-200). Skipping cleanup."
+        fi
+        rm -f "$DISCUSSIONS_RESPONSE"
 
         if command -v jq > /dev/null 2>&1; then
+          # Deduplicate by (path, line, severity): group multiple comments on same location into a single body.
           COMMENT_COUNT=$(jq '[.comments[] | select(.path != "" and .line > 0)] | length' review.json 2>/dev/null || echo 0)
-          echo "Debug: inline comments to post: $COMMENT_COUNT"
+          echo "Debug: raw inline comments in JSON: $COMMENT_COUNT"
 
-          jq -c --arg base "$BASE_SHA" --arg head "$HEAD_SHA" --argjson em "$EMOJI_MAP" \
-            '.comments[] | select(.path != "" and .line > 0) |
-            { body: (($em[.severity] // "💡") + " **" + .severity + "**: " + .body),
-              path: .path, line: .line }' review.json | while IFS= read -r item; do
+          jq -c --arg base "$BASE_SHA" --arg head "$HEAD_SHA" --argjson em "$EMOJI_MAP" --arg m "$BOT_MARKER" '
+            .comments
+            | map(select(.path != "" and .line > 0))
+            | group_by(.path, .line, (.severity | ascii_downcase))
+            | map({
+                path: .[0].path,
+                line: .[0].line,
+                body: (
+                  (.[0].severity | ascii_downcase) as $sev
+                  | ($em[$sev] // "💡")
+                    + " **" + $sev + "**:\n"
+                    + (map("- " + .body) | join("\n"))
+                    + "\n\n"
+                    + $m
+                )
+              })
+            | .[]
+          ' review.json | while IFS= read -r item; do
 
             CPATH=$(echo "$item" | jq -r '.path')
             CLINE=$(echo "$item" | jq -r '.line')
